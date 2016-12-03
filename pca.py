@@ -13,37 +13,124 @@
 import numpy as np
 from sklearn.utils.extmath import fast_dot
 
-# Assumes that the feature vectors x(i) are in rows, and each
-# column represents a specific feature. There are n feature
-# vectors and d features in each vector.
-#
-# Returns a 2D array containing the principal components (a basis).
-# The components array is (k x d), where (k = num_components) and d
-# is the number of features.
-def pca(X, num_components):
-    components = []
-    n, d = X.shape
-    
-    # Create the covariance matrix.
-    mu = np.mean(X, axis=0)
-    Z = X - mu
-    A = fast_dot(Z.T, Z) / d
+#######################################################################
+# A PCA TRANSFORMER                                                   #
+#######################################################################
+class pca_transformer:
+	# Assumes that the feature vectors x(i) are in rows, and each
+	# column represents a specific feature. There are n feature
+	# vectors and d features in each vector.
+	def __init__(self, X, num_components):
+		# Basic initialization.
+		n, self.d = X.shape
+		components = []
 
-    while len(components) < num_components:
-        eigenvector, eigenvalue = next_eigenvector(A)
-        components.append(eigenvector)
-        A = deflate(A, eigenvector, eigenvalue)
-    
-    return np.array(components)
+		# Calculate the covariance matrix.
+		self.mu = np.mean(X, axis=0)
+		Z = X - self.mu
+		A = fast_dot(Z.T, Z) / self.d
 
+		# Perform PCA.
+		while len(components) < num_components:
+			eigenvector, eigenvalue = next_eigenvector(A)
+			components.append(eigenvector)
+			A = deflate(A, eigenvector, eigenvalue)
 
+		self.components = np.array(components)
+
+	# X should be in the same form of above, or a singleton of length d.
+	def transform(self, X):
+		# Handle singleton inputs.
+		if len(X.shape) == 1:
+			X = X.reshape([1, -1])
+
+		# Transform.
+		B = transform(X, self.components, self.mu)
+
+		# Handle singleton outputs.
+		if len(X.shape) == 1:
+			return B[0]
+		return B
+
+#######################################################################
+# A FISHER TRANSFORMER                                                #
+#######################################################################
+class fisher_transformer:
+	# Same as for PCA. {y} contains the corresponding classes for
+	# each value of {X}.
+	def __init__(self, X, y, num_components):
+		# Basic initialization.
+		n, d = X.shape
+		components = []
+
+		# Calculate the covariance matrix.
+		self.mu = np.mean(X, axis=0)
+		Z = X - self.mu
+		A = fast_dot(Z.T, Z) / d
+
+		# Determine the class means.
+		classes = {}
+		means = {}
+		for i in range(y.shape[0]):
+			# Handle new classes.
+			if y[i] not in classes:
+				classes[y[i]] = 0
+				means[y[i]] = np.zeros([d])
+
+			# Update counts and sums.
+			classes[y[i]] += 1
+			means[y[i]] += X[i]
+
+		for c, mean in means:
+			means[mean] /= classes[c]
+
+		# Calculate the within-class scatter.
+		Sw = np.zeros([d, d])
+		for i in range(n):
+			x = X[i]
+			c = y[i]
+			z = x - means[c]
+			Sw += fast_dot(z.reshape(1, -1), z)
+
+		# Calculate the between-class scatter.
+		Sb = np.zeros([d, d])
+		for c, count in classes:
+			z = means[c] - self.mu
+			Sb += count * fast_dot(z.reshape(1, -1), z)
+
+		# The matrix whose eigenvectors we want.
+		A = fast_dot(np.inv(Sw), Sb)
+
+		# Find the top eigenvectors.
+		while len(components) < num_components:
+			eigenvector, eigenvalue = next_eigenvector(A)
+			components.append(eigenvector)
+			A = deflate(A, eigenvector, eigenvalue)
+
+		self.components = np.array(components)
+
+	# X should be in the same form of above, or a singleton of length d.
+	def transform(self, X):
+		# Handle singleton inputs.
+		if len(X.shape) == 1:
+			X = X.reshape([1, -1])
+
+		# Transform.
+		B = transform(X, self.components, self.mu)
+
+		# Handle singleton outputs.
+		if len(X.shape) == 1:
+			return B[0]
+		return B
+
+#######################################################################
+# HELPER FUNCTIONS SHARED BETWEEN PCA AND FISHER                      #
+#######################################################################
 
 # Projects the matrix X (same as in pca) onto the coordinate system
 # specified by components.
-def transform(X, components, Xtr):
-    mu = np.mean(Xtr, axis=0)
+def transform(X, components, mu):
     Z = X - mu
-
     return fast_dot(Z, components.T)
 
 # Use the power method to calculate the eigenvector corresponding

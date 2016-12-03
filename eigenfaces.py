@@ -15,7 +15,7 @@ from sklearn.linear_model import LogisticRegression as lr
 from sklearn.neighbors import KNeighborsClassifier as knn
 
 
-from pca import pca, transform
+from pca import pca_transformer
 from time import time
 import os
 import sys
@@ -41,15 +41,15 @@ def create_train_test(k, classifier='logistic'):
 		# Perform PCA.
 		perror('Performing principal component analysis with %d components.' % k)
 		t0 = time()
-		components = np.array(pca(faces, k))
+		transformer = pca_transformer(faces, k)
 		perror('Completed principal component analysis in %.3f seconds' % (time() - t0))
 
 		# Transform the individual faces.
-		Y = transform(faces, components, faces)
+		Y = transformer.transform(faces)
 
 		# Transform the pairs of faces.
 		P = np.array(pairs).reshape([-1, w * h])
-		P = transform(P, components, faces)
+		P = transformer.transform(P)
 		P = P.reshape([-1, k * 2])
 		Q = np.zeros([len(pairs)], dtype=np.float64)
 		for i in range(len(pairs)):
@@ -77,12 +77,12 @@ def create_train_test(k, classifier='logistic'):
 			model.fit(Y, names)
 			perror('KNN completed in %.3f seconds.' % (time() - t0))
 
-		return model, components, faces
+		return model, transformer
 
 	def same_or_different(face1, face2, m):
-		model, components, faces = m
-		f1 = transform(np.ravel(face1).reshape(1, -1), components, faces)
-		f2 = transform(np.ravel(face2).reshape(1, -1), components, faces)
+		model, transformer = m
+		f1 = transformer.transform(np.ravel(face1).reshape(1, -1))
+		f2 = transformer.transform(np.ravel(face2).reshape(1, -1))
 
 		if classifier == 'logistic_pairs':
 			return model.predict(np.array([np.linalg.norm(f1 - f2)]).reshape([1, -1]))[0]
