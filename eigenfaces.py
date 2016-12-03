@@ -15,7 +15,7 @@ from sklearn.linear_model import LogisticRegression as lr
 from sklearn.neighbors import KNeighborsClassifier as knn
 
 
-from pca import pca_transformer
+from pca import pca_transformer, fisher_transformer
 from time import time
 import os
 import sys
@@ -27,76 +27,73 @@ perror = print
 
 
 # Create a training function.
-def create_train_test(k, classifier='logistic'):
+def create_train_test(k, classifier='logistic', fisher=False, feature='pair'):
 	# Define a training function.
-	def train(set, classes, pairs, targets):
-		perror('Beginning eigenface training procedure.')
+	def train(pairs, targets, names):
 		# Create a training matrix.
-		names, faces = zip(*set)
-		faces = np.array(faces)
-		n, w, h = faces.shape
-		faces = faces.reshape([n, w * h])
-		perror('Running on %d images with resolution %d x %d' % (n, w, h))
+		perror('Beginning eigenface training procedure.')
+		n = len(pairs)
+		w, h = pairs[0][0].shape[:2]
+		perror('Running on %d pairs of images with resolution %d x %d' % (n, w, h))
 
-		# Perform PCA.
-		perror('Performing principal component analysis with %d components.' % k)
+		# Prepare to perofrm dimensionality reduction.
+		P = np.array(pairs).reshape([2*n, -1])
+		N = np.ravel(np.array(names))
+
+		# Create a transformer.
 		t0 = time()
-		transformer = pca_transformer(faces, k)
-		perror('Completed principal component analysis in %.3f seconds' % (time() - t0))
+		perror('Finding the basis for dimensionality reduction.')
+		if fisher:
+			transformer = fisher_transformer(P, N, k)
+		else:
+			transformer = pca_transformer(P, k, save=False)
+		perror('Found the basis in %.3f seconds' % (time() - t0))
 
-		# Transform the individual faces.
-		Y = transformer.transform(faces)
+		# Transform the training data and put it back into pairs.
+		t0 = time()
+		P = transformer.transform(P).reshape([-1, k * 2])
 
-		# Transform the pairs of faces.
-		P = np.array(pairs).reshape([-1, w * h])
-		P = transformer.transform(P)
-		P = P.reshape([-1, k * 2])
-		Q = np.zeros([len(pairs)], dtype=np.float64)
-		for i in range(len(pairs)):
-			Q[i] = np.linalg.norm(P[i][:k] - P[i][k:])
-		P = Q.reshape(-1, 1)
-		perror('Transformed all faces into the component space.')
+		# If distances were requested, calculate distances.
+		if feature=='distance':
+			Q = np.zeros(n)
+			for i in range(n):
+				Q[i] = np.linalg.norm(P[i][:k] - P[i][k:])
+			P = Q.reshape(-1, 1)
+		elif feature=='difference':
+			Q = np.zeros((n, k))
+			for i in range(n):
+				Q[i] = P[i][:k] - P[i][k:]
+			P = Q
+		perror('Transformed all faces into the component space in %.3f seconds.' % (time() - t0))
 
-		# Train a classifier.
-		if classifier == 'logistic_pairs':
-			t0 = time()
-			perror('Performing logistic regression on pairs.')
-			model = lr()
-			model.fit(P, targets)
-			perror('Logistic regression on pairs completed in %.3f seconds.' % (time() - t0))
-		elif classifier == 'logistic':
+
+		# Build the appropriate classifier.
+		if classifier == 'logistic':
 			t0 = time()
 			perror('Performing logistic regression.')
-			model = lr(solver='lbfgs', multi_class='multinomial')
-			model.fit(Y, names)
+			model = lr()
+			model.fit(P, targets)
 			perror('Logistic regression completed in %.3f seconds.' % (time() - t0))
-		elif classifier == 'knn':
-			t0 = time()
-			perror('Performing knn classification.')
-			model = knn(weights = 'distance')
-			model.fit(Y, names)
-			perror('KNN completed in %.3f seconds.' % (time() - t0))
 
 		return model, transformer
 
 	def same_or_different(face1, face2, m):
 		model, transformer = m
-		f1 = transformer.transform(np.ravel(face1).reshape(1, -1))
-		f2 = transformer.transform(np.ravel(face2).reshape(1, -1))
 
-		if classifier == 'logistic_pairs':
-			return model.predict(np.array([np.linalg.norm(f1 - f2)]).reshape([1, -1]))[0]
+		# Transform the faces.
+		f1 = transformer.transform(np.ravel(face1))
+		f2 = transformer.transform(np.ravel(face2))
+		if feature=='distance':
+			feature_vec = np.linalg.norm(f1 - f2)
+		elif feature=='difference':
+			feature_vec = f1 - f2
 		else:
-			y1 = model.predict(transform(f1.reshape(1, -1), components, faces))[0]
-			y2 = model.predict(transform(f2.reshape(1, -1), components, faces))[0]
-			return y1 == y2
+			feature_vec = np.ravel(np.array([f1, f2]))
+		feature_vec = feature_vec.reshape([1, -1])
 
-	def classify(face1, m):
-		model, components, faces = m
-		f1 = np.ravel(face1)
-		return model.predict(transform(f1.reshape(1, -1), components, faces))[0]
+		return model.predict(feature_vec)[0]
 
-	return train, same_or_different, classify
+	return train, same_or_different
 
 #train, test = create_train_test(50)
 #print(load_lfw.run_test_unrestricted(1, train, test, type='funneled', resize=.3, color=False))

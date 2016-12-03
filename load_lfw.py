@@ -166,10 +166,12 @@ def load_pairs(type, resize=None, color=False, folds=10):
 # the same person and False otherwise.
 # If pairwise == False, then outcome_fn takes one face and returns the name associated with
 # it (or None if it doesn't belong to any trained identity).
-def run_test_unrestricted(folds, train_fn, outcome_fn, type, resize, color, pairwise=True):
+def run_test(folds, train_fn, outcome_fn, type, resize, color):
 	sets = load_pairs(type, resize, color)
 	success = 0
 	false_positive = 0
+	true_positive = 0
+	true_negative = 0
 	false_negative = 0
 	total = 0
 
@@ -177,58 +179,31 @@ def run_test_unrestricted(folds, train_fn, outcome_fn, type, resize, color, pair
 	for test in range(folds):
 
 		# Gather the training images.
-		training_images = {}
-		names = {}
+		names = []
 		pairs = []
 		targets = []
 		for j in list(range(0, test)) + list(range(test+1, len(sets))):
 			for ((name1, num1, face1), (name2, num2, face2)) in sets[j]:
-				training_images[name1 + str(num1)] = (name1, face1)
-				training_images[name2 + str(num2)] = (name2, face2)
-				names[name1] = 0
-				names[name2] = 0
+				names.append((name1, name2))
 				pairs.append((face1, face2))
 				targets.append(name1 == name2)
 
 		# Train the model.
-		trained = train_fn(training_images.values(), names.keys(), pairs, targets)
+		trained = train_fn(pairs, targets, names)
 
 		# Test the model.
-		tested_names = {}
 		for ((name1, num1, face1), (name2, num2, face2)) in sets[test]:
-			if pairwise:
 				expected = name1 == name2
 				actual = outcome_fn(face1, face2, trained)
 				total += 1
 
-				if expected == actual:
-					success += 1
+				if expected == actual and expected:
+					true_positive += 1
+				if expected == actual and not expected:
+					true_negative += 1
 				if expected and not(actual):
 					false_negative += 1
 				if actual and not(expected):
 					false_positive += 1
 
-			else:
-				for name, face in [(name1, face1), (name2, face2)]:
-					if name in tested_names:
-						continue
-					tested_names[name] = True
-					expected = name
-					actual = outcome_fn(face, trained)
-					print(expected + '\t\t' + actual)
-					print(expected in names)
-					print(expected in names.keys())
-					print(len(names.keys()))
-
-					if expected == actual:
-						success += 1
-					elif expected not in names and actual is None:
-						success += 1
-					elif expected not in names:
-						false_positive += 1
-					elif name is not None:
-						false_negative += 1
-
-					total += 1
-
-	return {'total': total, 'success' : success, 'false_pos' : false_positive, 'false_neg' : false_negative}
+	return {'total': total, 'true_pos' : true_positive, 'true_neg' : true_negative, 'false_pos' : false_positive, 'false_neg' : false_negative}

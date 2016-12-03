@@ -12,6 +12,9 @@
 
 import numpy as np
 from sklearn.utils.extmath import fast_dot
+from time import time
+perror = print
+import scipy.misc
 
 #######################################################################
 # A PCA TRANSFORMER                                                   #
@@ -20,7 +23,7 @@ class pca_transformer:
 	# Assumes that the feature vectors x(i) are in rows, and each
 	# column represents a specific feature. There are n feature
 	# vectors and d features in each vector.
-	def __init__(self, X, num_components):
+	def __init__(self, X, num_components, save=False):
 		# Basic initialization.
 		n, self.d = X.shape
 		components = []
@@ -31,10 +34,15 @@ class pca_transformer:
 		A = fast_dot(Z.T, Z) / self.d
 
 		# Perform PCA.
+		i = 0
 		while len(components) < num_components:
 			eigenvector, eigenvalue = next_eigenvector(A)
 			components.append(eigenvector)
 			A = deflate(A, eigenvector, eigenvalue)
+			if save:
+				i += 1
+				print(eigenvector.shape)
+				scipy.misc.imsave(str(i) + '.jpg', eigenvector.reshape([75, 75]))
 
 		self.components = np.array(components)
 
@@ -81,25 +89,34 @@ class fisher_transformer:
 			classes[y[i]] += 1
 			means[y[i]] += X[i]
 
-		for c, mean in means:
-			means[mean] /= classes[c]
+		for c, mean in means.items():
+			means[c] /= classes[c]
+
+
+		# Calculate a centered matrix.
+		Z = np.zeros(X.shape)
+		for i in range(n):
+			Z[i] = X[i] - means[y[i]]
 
 		# Calculate the within-class scatter.
-		Sw = np.zeros([d, d])
-		for i in range(n):
-			x = X[i]
-			c = y[i]
-			z = x - means[c]
-			Sw += fast_dot(z.reshape(1, -1), z)
+		t0 = time()
+		perror('Calculating the within-class scatter.')
+		Sw = fast_dot(Z.T, Z)
+		perror('Calculated in %.3f seconds' % (time() - t0))
 
 		# Calculate the between-class scatter.
-		Sb = np.zeros([d, d])
-		for c, count in classes:
-			z = means[c] - self.mu
-			Sb += count * fast_dot(z.reshape(1, -1), z)
+		t0 = time()
+		perror('Calculating the between-class scatter.')
+		Z = np.zeros([len(classes.keys()), d])
+		for i, (c, m) in enumerate(means.items()):
+			Z[i] = np.sqrt(classes[c]) * (m - self.mu)
+		Sb = fast_dot(Z.T, Z)
+		perror('Calculated in %.3f seconds.' % (time() - t0))
 
 		# The matrix whose eigenvectors we want.
-		A = fast_dot(np.inv(Sw), Sb)
+		t0 = time()
+		A = fast_dot(np.linalg.inv(Sw), Sb)
+		perror('Inverted Sw and multiplied it by Sb in %.3f seconds.' % (time() - t0))
 
 		# Find the top eigenvectors.
 		while len(components) < num_components:
