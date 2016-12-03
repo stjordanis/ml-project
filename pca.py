@@ -28,46 +28,46 @@ def pca(X, num_components):
     mu = np.mean(X, axis=0)
     Z = X - mu
     A = fast_dot(Z.T, Z) / d
-    t = 1
 
     while len(components) < num_components:
-	sys.stderr.write('Finding eigenvector %d of %d' % (t, num_components))
-	t += 1
         eigenvector, eigenvalue = next_eigenvector(A)
         components.append(eigenvector)
         A = deflate(A, eigenvector, eigenvalue)
     
     return np.array(components)
 
+
+
 # Projects the matrix X (same as in pca) onto the coordinate system
 # specified by components.
 def transform(X, components, Xtr):
     mu = np.mean(Xtr, axis=0)
     Z = X - mu
-    
+
     return fast_dot(Z, components.T)
-    
-# Use the power method to calculate an eigenvector of X.
+
+# Use the power method to calculate the eigenvector corresponding
+# to the largest eigenvalue of X.
 def next_eigenvector(A):
     n, d = A.shape
-    
+
     # Initialze the eigenvector randomly.
     u = np.random.random([d])
     u = u / np.linalg.norm(u)
     u_prev = None
-    
+
     # Iteratively update the eigenvector.
     while u_prev is None or np.linalg.norm(u - u_prev) > .000001:
         # Update u
         u_prev = u
         u = fast_dot(A, u)
         u_norm = np.linalg.norm(u)
-        
+
         # Make u canonical length and orientation.
         u = u / u_norm
         if u[0] < 0:
             u = u * -1
-    
+
     return (u, u_norm)
 
 # Deflate a matrix by an eigenvector and eigenvalue.
@@ -75,14 +75,3 @@ def deflate(A, eigenvector, eigenvalue):
     ev = eigenvector[np.newaxis].T
     B = eigenvalue * fast_dot(ev, ev.T)
     return A - B
-    
-    
-# Testing code.
-#from sklearn.decomposition import PCA as sklearn_pca
-#A = np.array([[1, 2, 1], [6, -1, 0], [-1, -2, -1], [4, 5, 6], [8, 9, 10]])
-#print(pca(A, 5))
-#print('ALT IS BROKEN')
-#print(pca(A, 2, alt=True))
-#skp = sklearn_pca(n_components=2)
-#skp.fit(A)
-#print(skp.components_)

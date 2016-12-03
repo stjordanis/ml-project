@@ -29,7 +29,7 @@ perror = print
 # Create a training function.
 def create_train_test(k, classifier='logistic'):
 	# Define a training function.
-	def train(set, classes):
+	def train(set, classes, pairs, targets):
 		perror('Beginning eigenface training procedure.')
 		# Create a training matrix.
 		names, faces = zip(*set)
@@ -43,99 +43,61 @@ def create_train_test(k, classifier='logistic'):
 		t0 = time()
 		components = np.array(pca(faces, k))
 		perror('Completed principal component analysis in %.3f seconds' % (time() - t0))
+
+		# Transform the individual faces.
 		Y = transform(faces, components, faces)
+
+		# Transform the pairs of faces.
+		P = np.array(pairs).reshape([-1, w * h])
+		P = transform(P, components, faces)
+		P = P.reshape([-1, k * 2])
+		Q = np.zeros([len(pairs)], dtype=np.float64)
+		for i in range(len(pairs)):
+			Q[i] = np.linalg.norm(P[i][:k] - P[i][k:])
+		P = Q.reshape(-1, 1)
 		perror('Transformed all faces into the component space.')
 
 		# Train a classifier.
-		if classifier == 'logistic':
+		if classifier == 'logistic_pairs':
+			t0 = time()
+			perror('Performing logistic regression on pairs.')
+			model = lr()
+			model.fit(P, targets)
+			perror('Logistic regression on pairs completed in %.3f seconds.' % (time() - t0))
+		elif classifier == 'logistic':
 			t0 = time()
 			perror('Performing logistic regression.')
 			model = lr(solver='lbfgs', multi_class='multinomial')
 			model.fit(Y, names)
 			perror('Logistic regression completed in %.3f seconds.' % (time() - t0))
 		elif classifier == 'knn':
-			
-		
+			t0 = time()
+			perror('Performing knn classification.')
+			model = knn(weights = 'distance')
+			model.fit(Y, names)
+			perror('KNN completed in %.3f seconds.' % (time() - t0))
 
 		return model, components, faces
 
 	def same_or_different(face1, face2, m):
 		model, components, faces = m
-		f1 = np.ravel(face1)
-		f2 = np.ravel(face2)
-		y1 = model.predict(transform(f1.reshape(1, -1), components, faces))[0]
-		y2 = model.predict(transform(f2.reshape(1, -1), components, faces))[0]
-		return y1 == y2
+		f1 = transform(np.ravel(face1).reshape(1, -1), components, faces)
+		f2 = transform(np.ravel(face2).reshape(1, -1), components, faces)
 
-	return train, same_or_different
+		if classifier == 'logistic_pairs':
+			return model.predict(np.array([np.linalg.norm(f1 - f2)]).reshape([1, -1]))[0]
+		else:
+			y1 = model.predict(transform(f1.reshape(1, -1), components, faces))[0]
+			y2 = model.predict(transform(f2.reshape(1, -1), components, faces))[0]
+			return y1 == y2
+
+	def classify(face1, m):
+		model, components, faces = m
+		f1 = np.ravel(face1)
+		return model.predict(transform(f1.reshape(1, -1), components, faces))[0]
+
+	return train, same_or_different, classify
 
 #train, test = create_train_test(50)
 #print(load_lfw.run_test_unrestricted(1, train, test, type='funneled', resize=.3, color=False))
 
-'''
-# Load the LFW images.
-lfw_people = fetch_lfw_people(min_faces_per_person=70, resize=.4)
-
-# Load the faces.
-n, h, w = lfw_people.images.shape
-X = lfw_people.data.astype('float64')
-d = X.shape[1]
-
-# Load the targets.
-t = lfw_people.target
-t_names = lfw_people.target_names
-classes = t_names.shape[0]
-
-# Print basics.
-print('Dataset Size')
-print('-'*20)
-print('faces\t\t%d' % n)
-print('pixels\t\t%d'% d)
-print('(w, h)\t\t(%d, %d)' % (w, h))
-print('identities\t%d' % int(classes))
-
-# Split into train and test sets.
-X1, X2, t1, t2 = train_test_split(X, t, test_size=.25, random_state=0)
-
-# Function for running a test.
-def run_test(k, classifier):
-    components = np.array(pca(X1, k))
-    #comps = sklearn.decomposition.PCA(n_components=k, svd_solver='randomized').fit(X1)
-    #eigenfaces = components.reshape((k, h, w))
-    
-    Y1 = transform(X1, components, X1)
-    Y2 = transform(X2, components, X1)
-    
-    #print(comps.components_ - components)
-    
-    
-    #Y1 = comps.transform(X1)
-    #Y2 = comps.transform(X2)
-    
-    if classifier == 'logistic':
-        model = lr(multi_class='multinomial', solver='lbfgs')
-        model.fit(Y1, t1)
-        y2 = model.predict(Y2)
-    elif classifier == 'svm':
-        svm = sklearn.svm.SVC()
-        svm.fit(Y1, t1)
-        y2 = svm.predict(Y2)
-    elif classifier == 'original':
-        # Prepare for the original classifier.
-        per_class_count = np.zeros(classes)
-        per_class_proj = np.zeros((classes, k))
-        
-        for i in range(Y1.shape[0]):
-            per_class_proj[t1[i]] = (per_class_proj[t1[i]] * per_class_count[t1[i]] + Y1[i]) / (per_class_count[t1[i]] + 1)
-            per_class_count[t1[i]] += 1
-        
-        y2 = np.argmin(pairwise_distances(Y2, per_class_proj, metric='euclidean'), axis=1)
-    
-    return y2
-
-t0 = time()
-out = run_test(150, 'logistic')
-print(time() - t0)
-print(classification_report(t2, out, target_names=t_names))
-print('Accuracy: %f' % sklearn.metrics.accuracy_score(t2, out))
-'''
