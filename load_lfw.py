@@ -9,6 +9,7 @@ import sys
 import tarfile
 from scipy.misc import imread,imresize
 from time import time
+from multiprocessing import Process, Queue
 
 LFW_DIR = '.lfw'
 NORMAL_DIR = 'lfw_normal'
@@ -18,6 +19,7 @@ FUNNELED_URL = 'http://vis-www.cs.umass.edu/lfw/lfw-funneled.tgz'
 PAIRS_URL = 'http://vis-www.cs.umass.edu/lfw/pairs.txt'
 cache = {}
 
+# Convert a type into the appropriate data path.
 def type_to_paths(type):
 	# Create the path to the file.
 	if type == 'funneled':
@@ -27,7 +29,8 @@ def type_to_paths(type):
 
 	return subdir, url
 
-def load(type='funneled'):
+# Download images.
+def download(type='funneled'):
 	subdir, url = type_to_paths(type)
 
 	# Create the folder if it doesn't exist.
@@ -58,7 +61,7 @@ def load(type='funneled'):
 		tar = tarfile.open(tarname, 'r:gz').extractall(path=path)
 		os.remove(tarname)
 
-
+# Retrieve all images from disk.
 def get_all_images(type, resize=None, color=False):
 	subdir, _ = type_to_paths(type)
 	subpath = os.path.join('.', LFW_DIR, subdir)
@@ -73,6 +76,7 @@ def get_all_images(type, resize=None, color=False):
 
 	get_these_images(images, type, resize, color)
 
+# Retrieve a specific set of images from disk (provided via filename).
 def get_these_images(images, type, resize, color):
 	# Load the images.
 	x0, x1, y0, y1 = 0, 250, 0, 250
@@ -84,23 +88,19 @@ def get_these_images(images, type, resize, color):
 
 	# Create the numpy array for storing the images.
 	if color:
-		faces = np.zeros((len(images), h, w, 3), dtype=np.float32)
+		faces = np.zeros((len(images), h, w, 3), dtype=np.float64)
 	else:
-		faces = np.zeros((len(images), h, w), dtype=np.float32)
+		faces = np.zeros((len(images), h, w), dtype=np.float64)
 
-	# Dictionaries for mapping file numbers to names.
-	num_to_name = {}
-	index_to_num = {}
-
+	# Load the images.
 	for i, file in enumerate(images):
 		# Read the image from the file.
-		if file not in cache:
+		if os.path.basename(file) not in cache:
 			image = imread(file)
-			cache[file] = np.asarray(image, dtype=np.float32)
-		face = cache[file]
 
-		# Scale the pixel values between 0 and 1.
-		face = face/255.
+			# Cache and scale the image.
+			cache[os.path.basename(file)] = np.asarray(image, dtype=np.float64) / 255.
+		face = cache[os.path.basename(file)]
 
 		# Resize the image if requested.
 		if resize is not None:
@@ -114,30 +114,35 @@ def get_these_images(images, type, resize, color):
 
 		# Determine the name and number of the image.
 		filename = os.path.basename(file).split('.')[0]
-		name, num = filename.rsplit('_', 1)
-		num_to_name[int(num)] = name
-		index_to_num[i] = int(num)
 
-	return faces, index_to_num, num_to_name
+	return faces
 
-def load_pairs(type, resize=None, color=False):
-	load(type)
+def load_pairs(type, resize=None, color=False, folds=10):
+	download(type)
 	pairs = open(os.path.join('.', LFW_DIR, 'pairs.txt')).readlines()[1:]
 
 	# Store the output.
 	sets = []
+	retrieved = {}
 
 	# Create a filename for an image.
 	def retrieve(name, num):
+		# Get from cache.
+		if name + str(num) in retrieved:
+			return (name, num, retrieved[name + str(num)])
+
+		# Otherwise, retrieve from disk and cache.
 		subdir, _ = type_to_paths(type)
 		filename = os.path.join('.', LFW_DIR, subdir, name, name + '_' + str(num).zfill(4) + '.jpg')
-		face = get_these_images([filename], type, resize, color)[0][0]
+		face = get_these_images([filename], type, resize, color)[0]
+		retrieved[name + str(num)] = face
 		return (name, num, face)
 
 	# Load.
-	for set in range(10):
+	for set in range(folds):
 		new_set = []
 
+		# Extract match pairs.
 		for match_pair in range(300):
 			i = set * 600 + match_pair
 			name, x, y = pairs[i].split()
@@ -145,6 +150,7 @@ def load_pairs(type, resize=None, color=False):
 
 			new_set.append((f1, f2))
 
+		# Extract non-match pairs.
 		for unmatch_pair in range(300, 600):
 			i = set * 600 + unmatch_pair
 			name1, x1, name2, x2 = pairs[i].split()
@@ -155,7 +161,7 @@ def load_pairs(type, resize=None, color=False):
 
 	return sets
 
-def run_test_unrestricted(train, same_or_different, type, resize, color):
+def run_test_unrestricted(folds, train, same_or_different, type, resize, color):
 	sets = load_pairs(type, resize, color)
 	success = 0
 	false_positive = 0
@@ -163,15 +169,15 @@ def run_test_unrestricted(train, same_or_different, type, resize, color):
 	total = 0
 
 	# Create a holdout set.
-	for test in range(len(sets)):
+	for test in range(folds):
 
 		# Gather the training images.
 		training_images = {}
 		names = {}
-		for train in list(range(0, test)) + list(range(test+1, len(sets))):
-			for ((name1, num1, face1), (name2, num2, face2)) in sets[train]:
-				training_images[num1] = (name1, face1)
-				training_images[num2] = (name2, face2)
+		for j in list(range(0, test)) + list(range(test+1, len(sets))):
+			for ((name1, num1, face1), (name2, num2, face2)) in sets[j]:
+				training_images[name1 + str(num1)] = (name1, face1)
+				training_images[name2 + str(num2)] = (name2, face2)
 				names[name1] = 0
 				names[name2] = 0
 
@@ -181,16 +187,15 @@ def run_test_unrestricted(train, same_or_different, type, resize, color):
 		# Test the model.
 		for ((name1, num1, face1), (name2, num2, face2)) in sets[test]:
 			expected = name1 == name2
-			actual = same_or_different(face1, face2)
+			actual = same_or_different(face1, face2, trained)
 			total += 1
 
 			if expected == actual:
 				success += 1
 			if expected and not(actual):
 				false_negative += 1
-			if actual and not(expected:
+			if actual and not(expected):
 				false_positive += 1
 
 
 	return {'total': total, 'success' : success, 'false_pos' : false_positive, 'false_neg' : false_negative}
-

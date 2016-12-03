@@ -11,6 +11,7 @@
 #######################################################################
 
 import numpy as np
+from sklearn.utils.extmath import fast_dot
 
 # Assumes that the feature vectors x(i) are in rows, and each
 # column represents a specific feature. There are n feature
@@ -26,11 +27,14 @@ def pca(X, num_components):
     # Create the covariance matrix.
     mu = np.mean(X, axis=0)
     Z = X - mu
-    A = Z.T.dot(Z) / d
-    
+    A = fast_dot(Z.T, Z) / d
+    t = 1
+
     while len(components) < num_components:
+	sys.stderr.write('Finding eigenvector %d of %d' % (t, num_components))
+	t += 1
         eigenvector, eigenvalue = next_eigenvector(A)
-        components.append(eigenvector * (1 / np.sqrt(eigenvalue)))
+        components.append(eigenvector)
         A = deflate(A, eigenvector, eigenvalue)
     
     return np.array(components)
@@ -41,7 +45,7 @@ def transform(X, components, Xtr):
     mu = np.mean(Xtr, axis=0)
     Z = X - mu
     
-    return Z.dot(components.T)
+    return fast_dot(Z, components.T)
     
 # Use the power method to calculate an eigenvector of X.
 def next_eigenvector(A):
@@ -56,7 +60,7 @@ def next_eigenvector(A):
     while u_prev is None or np.linalg.norm(u - u_prev) > .000001:
         # Update u
         u_prev = u
-        u = A.dot(u)
+        u = fast_dot(A, u)
         u_norm = np.linalg.norm(u)
         
         # Make u canonical length and orientation.
@@ -69,7 +73,7 @@ def next_eigenvector(A):
 # Deflate a matrix by an eigenvector and eigenvalue.
 def deflate(A, eigenvector, eigenvalue):
     ev = eigenvector[np.newaxis].T
-    B = eigenvalue * ev.dot(ev.T)
+    B = eigenvalue * fast_dot(ev, ev.T)
     return A - B
     
     

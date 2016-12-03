@@ -6,18 +6,73 @@
 #######################################################################
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import GridSearchCV
-from sklearn.datasets import fetch_lfw_people
 from sklearn.metrics import classification_report
-from sklearn.metrics import confusion_matrix
 from sklearn.metrics.pairwise import pairwise_distances
 import numpy as np
 import sklearn
 
 from sklearn.linear_model import LogisticRegression as lr
+from sklearn.neighbors import KNeighborsClassifier as knn
+
 
 from pca import pca, transform
 from time import time
+import os
+import sys
+import mkl
+mkl.set_num_threads(16)
+import load_lfw
+from time import time
+perror = print
 
+
+# Create a training function.
+def create_train_test(k, classifier='logistic'):
+	# Define a training function.
+	def train(set, classes):
+		perror('Beginning eigenface training procedure.')
+		# Create a training matrix.
+		names, faces = zip(*set)
+		faces = np.array(faces)
+		n, w, h = faces.shape
+		faces = faces.reshape([n, w * h])
+		perror('Running on %d images with resolution %d x %d' % (n, w, h))
+
+		# Perform PCA.
+		perror('Performing principal component analysis with %d components.' % k)
+		t0 = time()
+		components = np.array(pca(faces, k))
+		perror('Completed principal component analysis in %.3f seconds' % (time() - t0))
+		Y = transform(faces, components, faces)
+		perror('Transformed all faces into the component space.')
+
+		# Train a classifier.
+		if classifier == 'logistic':
+			t0 = time()
+			perror('Performing logistic regression.')
+			model = lr(solver='lbfgs', multi_class='multinomial')
+			model.fit(Y, names)
+			perror('Logistic regression completed in %.3f seconds.' % (time() - t0))
+		elif classifier == 'knn':
+			
+		
+
+		return model, components, faces
+
+	def same_or_different(face1, face2, m):
+		model, components, faces = m
+		f1 = np.ravel(face1)
+		f2 = np.ravel(face2)
+		y1 = model.predict(transform(f1.reshape(1, -1), components, faces))[0]
+		y2 = model.predict(transform(f2.reshape(1, -1), components, faces))[0]
+		return y1 == y2
+
+	return train, same_or_different
+
+#train, test = create_train_test(50)
+#print(load_lfw.run_test_unrestricted(1, train, test, type='funneled', resize=.3, color=False))
+
+'''
 # Load the LFW images.
 lfw_people = fetch_lfw_people(min_faces_per_person=70, resize=.4)
 
@@ -78,6 +133,9 @@ def run_test(k, classifier):
     
     return y2
 
+t0 = time()
 out = run_test(150, 'logistic')
+print(time() - t0)
 print(classification_report(t2, out, target_names=t_names))
 print('Accuracy: %f' % sklearn.metrics.accuracy_score(t2, out))
+'''
