@@ -94,6 +94,7 @@ class fisher_transformer:
 		Z = np.zeros(X.shape)
 		for i in range(n):
 			Z[i] = X[i] - means[y[i]]
+		Z = Z / d
 
 		# Calculate the within-class scatter.
 		t0 = time()
@@ -112,15 +113,16 @@ class fisher_transformer:
 
 		# The matrix whose eigenvectors we want.
 		t0 = time()
-		A = fast_dot(np.linalg.inv(Sw), Sb)
+		A = fast_dot(np.linalg.pinv(Sw), Sb)
 		perror('Inverted Sw and multiplied it by Sb in %.3f seconds.' % (time() - t0))
 
 		# Find the top eigenvectors.
+		i = 0
 		while len(components) < num_components:
 			eigenvector, eigenvalue = next_eigenvector(A)
 			components.append(eigenvector)
 			A = deflate(A, eigenvector, eigenvalue)
-			if save:
+			if True:
 				i += 1
 				scipy.misc.imsave(str(i) + 'fisher.jpg', eigenvector.reshape([75, 75]))
 

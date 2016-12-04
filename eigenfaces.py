@@ -75,6 +75,10 @@ def instance(k, classifier='logistic', fisher=False, feature='pair'):
 			model = lr()
 			model.fit(P, targets)
 			perror('Logistic regression completed in %.3f seconds.' % (time() - t0))
+		elif classifier == 'distance':
+			def model(fv1, fv2):
+				return np.linalg.norm(fv1 - fv2) < 10
+
 
 		return model, transformer
 
@@ -84,6 +88,10 @@ def instance(k, classifier='logistic', fisher=False, feature='pair'):
 		# Transform the faces.
 		f1 = transformer.transform(np.ravel(face1))
 		f2 = transformer.transform(np.ravel(face2))
+
+		if classifier == 'distance':
+			return model(f1, f2)
+
 		if feature=='distance':
 			feature_vec = np.linalg.norm(f1 - f2)
 		elif feature=='difference':

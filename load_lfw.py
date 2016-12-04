@@ -178,7 +178,6 @@ def load_pairs(type, resize=None, folds=10, color=False, crop=None):
 # it (or None if it doesn't belong to any trained identity).
 def run_test(folds, train_fn, outcome_fn, type, resize, color, crop=None):
 	sets = load_pairs(type, resize=resize, folds=10, color=color, crop=crop)
-	print(len(sets[0]))
 	success = 0
 	false_positive = 0
 	true_positive = 0
