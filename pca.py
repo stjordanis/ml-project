@@ -65,7 +65,11 @@ class pca_transformer:
 class fisher_transformer:
 	# Same as for PCA. {y} contains the corresponding classes for
 	# each value of {X}.
-	def __init__(self, X, y, num_components, save=False):
+	def __init__(self, X, y, num_components, save=False, zheng_paper=True):
+		if zheng_paper:
+			self.zheng_algorithm(X, y, num_components, save)
+			return
+
 		# Basic initialization.
 		n, d = X.shape
 		components = []
@@ -89,6 +93,9 @@ class fisher_transformer:
 		for c, mean in means.items():
 			means[c] /= classes[c]
 
+		perror('classes: %d' % len(classes.keys()))
+		perror('n: %d' % n)
+		perror('features: %d' % d)
 
 		# Calculate a centered matrix.
 		Z = np.zeros(X.shape)
@@ -112,6 +119,19 @@ class fisher_transformer:
 		perror('Calculated in %.3f seconds.' % (time() - t0))
 
 		# The matrix whose eigenvectors we want.
+		# Problem: When the number of features exceeds the number of samples,
+		# Sw will be singular (non-invertible).
+		# There are many solutions suggested by the literature:
+		# 1) Fisherfaces says to use PCA to reduce the feature space down to
+		#    size N-c. Doing so is prohibitively expensive for the number of
+		#    features we're using.
+		# 2) Others suggest using the inverse approximation. This doesn't seem
+		#    to yield useful results.
+		# 3) We can work on very low-resolution images. Seems to work reasonably
+                #    well at size 25x25. Cropping helps (try (280, 250)). It seems like it
+                #    generally works better on lower resolution. 
+                #    Initial best results: 10 components at .1 resize at (115, 250) crop.
+		perror('Determinant of Sw: %g' % np.linalg.det(Sw))
 		t0 = time()
 		A = fast_dot(np.linalg.pinv(Sw), Sb)
 		perror('Inverted Sw and multiplied it by Sb in %.3f seconds.' % (time() - t0))
@@ -119,14 +139,69 @@ class fisher_transformer:
 		# Find the top eigenvectors.
 		i = 0
 		while len(components) < num_components:
-			eigenvector, eigenvalue = next_eigenvector(A)
+			eigenvector, eigenvalue = next_eigenvector(A, threshold=.00001)
 			components.append(eigenvector)
 			A = deflate(A, eigenvector, eigenvalue)
-			if True:
+			if False:
 				i += 1
 				scipy.misc.imsave(str(i) + 'fisher.jpg', eigenvector.reshape([75, 75]))
 
 		self.components = np.array(components)
+
+
+	def zheng_algorithm(self, X, y, k, save):
+		# Basic initialization.
+		n, d = X.shape
+		components = []
+
+		# Calculate the mean face.
+		self.mu = np.mean(X, axis=0)
+
+		# Count the number of classes
+		idx = 0
+		c2i = {}
+		for yi in y:
+			if yi not in c2i:
+				c2i[yi] = idx
+				idx += 1
+		c = len(c2i.keys())
+
+		# Calculate the counts and means for each class.
+		pi = np.zeros((c, 1)) # Column vector of class counts.
+		E = np.zeros((n, c)) # Indicator of whether input i is in class j.
+		for i, yi in enumerate(y):
+			pi[c2i[yi]][0] += 1
+			E[i][c2i[yi]] = 1
+
+		# Matrices derived from pi and friends.
+		pi_sqrt = np.sqrt(pi)
+		PI = np.diag(pi.ravel())
+		PI_sqrt = np.diag(pi_sqrt)
+		H_pi = np.eye(c) - pi.dot(pi.T) / n
+		H_n = np.eye(n) - 1/n
+
+		# Method cited as "previous way of doing things"
+		#St = fast_dot(fast_dot(X.T, H_n), X)
+		#Sb = fast_dot(fast_dot(fast_dot(fast_dot(fast_dot(fast_dot(X.T, H_n), E), np.linalg.inv(PI)), E.T), H_n), X)
+
+		
+
+		t0 = time()
+		A = fast_dot(np.linalg.pinv(St), Sb)
+		perror('Inverted Sw and multiplied it by Sb in %.3f seconds.' % (time() - t0))
+
+		# Find the top eigenvectors.
+		i = 0
+		while len(components) < k:
+			eigenvector, eigenvalue = next_eigenvector(A, threshold=.00001)
+			components.append(eigenvector)
+			A = deflate(A, eigenvector, eigenvalue)
+			if False:
+				i += 1
+				scipy.misc.imsave(str(i) + 'fisher.jpg', eigenvector.reshape([75, 75]))
+
+		self.components = np.array(components)
+
 
 	# X should be in the same form of above, or a singleton of length d.
 	def transform(self, X):
@@ -154,7 +229,7 @@ def transform(X, components, mu):
 
 # Use the power method to calculate the eigenvector corresponding
 # to the largest eigenvalue of X.
-def next_eigenvector(A):
+def next_eigenvector(A, threshold=.000001):
     n, d = A.shape
 
     # Initialze the eigenvector randomly.
@@ -163,7 +238,7 @@ def next_eigenvector(A):
     u_prev = None
 
     # Iteratively update the eigenvector.
-    while u_prev is None or np.linalg.norm(u - u_prev) > .000001:
+    while u_prev is None or np.linalg.norm(u - u_prev) > threshold:
         # Update u
         u_prev = u
         u = fast_dot(A, u)
