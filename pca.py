@@ -41,7 +41,6 @@ class pca_transformer:
 			A = deflate(A, eigenvector, eigenvalue)
 			if save:
 				i += 1
-				print(eigenvector.shape)
 				scipy.misc.imsave(str(i) + '.jpg', eigenvector.reshape([75, 75]))
 
 		self.components = np.array(components)
@@ -71,18 +70,16 @@ class fisher_transformer:
 		n, d = X.shape
 		components = []
 
-		# Calculate the covariance matrix.
+		# Calculate the mean face.
 		self.mu = np.mean(X, axis=0)
-		Z = X - self.mu
-		A = fast_dot(Z.T, Z) / d
 
 		# Determine the class means.
 		classes = {}
 		means = {}
-		for i in range(y.shape[0]):
+		for i in range(n):
 			# Handle new classes.
 			if y[i] not in classes:
-				classes[y[i]] = 0
+				classes[y[i]] = 0.0
 				means[y[i]] = np.zeros([d])
 
 			# Update counts and sums.

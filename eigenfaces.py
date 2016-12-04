@@ -27,7 +27,7 @@ perror = print
 
 
 # Create a training function.
-def create_train_test(k, classifier='logistic', fisher=False, feature='pair'):
+def instance(k, classifier='logistic', fisher=False, feature='pair'):
 	# Define a training function.
 	def train(pairs, targets, names):
 		# Create a training matrix.
@@ -46,7 +46,7 @@ def create_train_test(k, classifier='logistic', fisher=False, feature='pair'):
 		if fisher:
 			transformer = fisher_transformer(P, N, k)
 		else:
-			transformer = pca_transformer(P, k, save=False)
+			transformer = pca_transformer(P, k, save=True)
 		perror('Found the basis in %.3f seconds' % (time() - t0))
 
 		# Transform the training data and put it back into pairs.
