@@ -65,7 +65,7 @@ class pca_transformer:
 class fisher_transformer:
 	# Same as for PCA. {y} contains the corresponding classes for
 	# each value of {X}.
-	def __init__(self, X, y, num_components):
+	def __init__(self, X, y, num_components, save=False):
 		# Basic initialization.
 		n, d = X.shape
 		components = []
@@ -120,6 +120,9 @@ class fisher_transformer:
 			eigenvector, eigenvalue = next_eigenvector(A)
 			components.append(eigenvector)
 			A = deflate(A, eigenvector, eigenvalue)
+			if save:
+				i += 1
+				scipy.misc.imsave(str(i) + 'fisher.jpg', eigenvector.reshape([75, 75]))
 
 		self.components = np.array(components)
 

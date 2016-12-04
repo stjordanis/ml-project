@@ -33,6 +33,7 @@ def instance(k, classifier='logistic', fisher=False, feature='pair'):
 		# Create a training matrix.
 		perror('Beginning eigenface training procedure.')
 		n = len(pairs)
+		perror(len(pairs))
 		w, h = pairs[0][0].shape[:2]
 		perror('Running on %d pairs of images with resolution %d x %d' % (n, w, h))
 
@@ -46,7 +47,7 @@ def instance(k, classifier='logistic', fisher=False, feature='pair'):
 		if fisher:
 			transformer = fisher_transformer(P, N, k)
 		else:
-			transformer = pca_transformer(P, k, save=True)
+			transformer = pca_transformer(P, k, save=False)
 		perror('Found the basis in %.3f seconds' % (time() - t0))
 
 		# Transform the training data and put it back into pairs.

@@ -77,20 +77,30 @@ def get_all_images(type, resize=None, color=False):
 	get_these_images(images, type, resize, color)
 
 # Retrieve a specific set of images from disk (provided via filename).
-def get_these_images(images, type, resize, color):
+def get_these_images(images, type, resize, color, crop):
 	# Load the images.
 	x0, x1, y0, y1 = 0, 250, 0, 250
-	h = 250
-	w = 250
+
+	if crop is not None:
+		ww, hh = crop
+		offw, offh = (x1 - x0 - ww)//2, (y1 - y0 - hh)//2
+		x0 += offw
+		y0 += offh
+		x1 -= offw
+		y1 -= offh
+
+	w = x1 - x0
+	h = y1 - y0
+
 	if resize is not None:
 		h = int(resize * h)
 		w = int(resize * w)
 
 	# Create the numpy array for storing the images.
 	if color:
-		faces = np.zeros((len(images), h, w, 3), dtype=np.float64)
+		faces = np.zeros((len(images), w, h, 3), dtype=np.float64)
 	else:
-		faces = np.zeros((len(images), h, w), dtype=np.float64)
+		faces = np.zeros((len(images), w, h), dtype=np.float64)
 
 	# Load the images.
 	for i, file in enumerate(images):
@@ -103,6 +113,7 @@ def get_these_images(images, type, resize, color):
 		face = cache[os.path.basename(file)]
 
 		# Resize the image if requested.
+		face = face[x0:x1][y0:y1]
 		if resize is not None:
 			face = imresize(face, resize)
 
@@ -117,14 +128,13 @@ def get_these_images(images, type, resize, color):
 
 	return faces
 
-def load_pairs(type, resize=None, color=False, folds=10):
+def load_pairs(type, resize=None, folds=10, color=False, crop=None):
 	download(type)
 	pairs = open(os.path.join('.', LFW_DIR, 'pairs.txt')).readlines()[1:]
 
 	# Store the output.
 	sets = []
 	retrieved = {}
-
 	# Create a filename for an image.
 	def retrieve(name, num):
 		# Get from cache.
@@ -134,7 +144,7 @@ def load_pairs(type, resize=None, color=False, folds=10):
 		# Otherwise, retrieve from disk and cache.
 		subdir, _ = type_to_paths(type)
 		filename = os.path.join('.', LFW_DIR, subdir, name, name + '_' + str(num).zfill(4) + '.jpg')
-		face = get_these_images([filename], type, resize, color)[0]
+		face = get_these_images([filename], type, resize, color, crop)[0]
 		retrieved[name + str(num)] = face
 		return (name, num, face)
 
@@ -166,8 +176,9 @@ def load_pairs(type, resize=None, color=False, folds=10):
 # the same person and False otherwise.
 # If pairwise == False, then outcome_fn takes one face and returns the name associated with
 # it (or None if it doesn't belong to any trained identity).
-def run_test(folds, train_fn, outcome_fn, type, resize, color):
-	sets = load_pairs(type, resize, color)
+def run_test(folds, train_fn, outcome_fn, type, resize, color, crop=None):
+	sets = load_pairs(type, resize=resize, folds=10, color=color, crop=crop)
+	print(len(sets[0]))
 	success = 0
 	false_positive = 0
 	true_positive = 0
