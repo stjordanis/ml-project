@@ -65,7 +65,8 @@ class pca_transformer:
 class fisher_transformer:
 	# Same as for PCA. {y} contains the corresponding classes for
 	# each value of {X}.
-	def __init__(self, X, y, num_components, save=False, zheng_paper=True):
+	# Zheng paper is broken.
+	def __init__(self, X, y, num_components, save=False, zheng_paper=False):
 		if zheng_paper:
 			self.zheng_algorithm(X, y, num_components, save)
 			return
@@ -142,9 +143,9 @@ class fisher_transformer:
 			eigenvector, eigenvalue = next_eigenvector(A, threshold=.00001)
 			components.append(eigenvector)
 			A = deflate(A, eigenvector, eigenvalue)
-			if False:
+			if True:
 				i += 1
-				scipy.misc.imsave(str(i) + 'fisher.jpg', eigenvector.reshape([75, 75]))
+				scipy.misc.imsave(str(i) + 'fisher.jpg', eigenvector.reshape([11, 25]))
 
 		self.components = np.array(components)
 
@@ -165,6 +166,7 @@ class fisher_transformer:
 				c2i[yi] = idx
 				idx += 1
 		c = len(c2i.keys())
+		print('Classes: %d' % c)
 
 		# Calculate the counts and means for each class.
 		pi = np.zeros((c, 1)) # Column vector of class counts.
@@ -176,19 +178,27 @@ class fisher_transformer:
 		# Matrices derived from pi and friends.
 		pi_sqrt = np.sqrt(pi)
 		PI = np.diag(pi.ravel())
-		PI_sqrt = np.diag(pi_sqrt)
+		PI_sqrt = np.diag(pi_sqrt.ravel())
 		H_pi = np.eye(c) - pi.dot(pi.T) / n
 		H_n = np.eye(n) - 1/n
+		M = fast_dot(fast_dot(np.linalg.inv(PI), E.T), X)
 
 		# Method cited as "previous way of doing things"
-		#St = fast_dot(fast_dot(X.T, H_n), X)
-		#Sb = fast_dot(fast_dot(fast_dot(fast_dot(fast_dot(fast_dot(X.T, H_n), E), np.linalg.inv(PI)), E.T), H_n), X)
-
-		
-
 		t0 = time()
+		St = fast_dot(fast_dot(X.T, H_n), X)
+		Sb = fast_dot(fast_dot(fast_dot(fast_dot(fast_dot(fast_dot(X.T, H_n), E), np.linalg.inv(PI)), E.T), H_n), X)
 		A = fast_dot(np.linalg.pinv(St), Sb)
-		perror('Inverted Sw and multiplied it by Sb in %.3f seconds.' % (time() - t0))
+
+		#from IPython.core.debugger import Tracer
+
+		#t0 = time()
+		#sig2 = 0
+		#G = fast_dot(fast_dot(fast_dot(H_n, X), X.T), H_n) + sig2 * np.eye(n)
+		#G = fast_dot(fast_dot(fast_dot(fast_dot(X.T, H_n), np.linalg.inv(G)), E), PI_sqrt)
+		#A = fast_dot(fast_dot(fast_dot(fast_dot(G, PI_sqrt), E.T), H_n), X)
+		#perror('Calculated A in %.3f seconds.' % (time() - t0))
+		#print(A.shape)
+		#Tracer()()
 
 		# Find the top eigenvectors.
 		i = 0
