@@ -66,10 +66,18 @@ class fisher_transformer:
 	# Same as for PCA. {y} contains the corresponding classes for
 	# each value of {X}.
 	# Zheng paper is broken.
-	def __init__(self, X, y, num_components, save=False, zheng_paper=False):
+	def __init__(self, X, y, num_components, save=False, zheng_paper=False, pca_first=None):
 		if zheng_paper:
 			self.zheng_algorithm(X, y, num_components, save)
 			return
+
+		if pca_first is not None:
+			t0 = time()
+			self.pca_transformer = pca_transformer(X, pca_first)
+			X = self.pca_transformer.transform(X)
+			perror('Transformed X using PCA with %d components in %.3f seconds.' % (pca_first, time() - t0))
+		else:
+			self.pca_transformer = None
 
 		# Basic initialization.
 		n, d = X.shape
@@ -99,7 +107,7 @@ class fisher_transformer:
 		perror('features: %d' % d)
 
 		# Calculate a centered matrix.
-		Z = np.zeros(X.shape)
+		Z = np.zeros(X.shape, dtype=float64)
 		for i in range(n):
 			Z[i] = X[i] - means[y[i]]
 		Z = Z / d
@@ -143,7 +151,7 @@ class fisher_transformer:
 			eigenvector, eigenvalue = next_eigenvector(A, threshold=.00001)
 			components.append(eigenvector)
 			A = deflate(A, eigenvector, eigenvalue)
-			if True:
+			if save:
 				i += 1
 				scipy.misc.imsave(str(i) + 'fisher.jpg', eigenvector.reshape([11, 25]))
 
@@ -218,6 +226,10 @@ class fisher_transformer:
 		# Handle singleton inputs.
 		if len(X.shape) == 1:
 			X = X.reshape([1, -1])
+
+		# Use PCA first if necessary.
+		if self.pca_transformer is not None:
+			X = self.pca_transformer.transform(X)
 
 		# Transform.
 		B = transform(X, self.components, self.mu)

@@ -27,7 +27,7 @@ perror = print
 
 
 # Create a training function.
-def instance(k, classifier='logistic', fisher=False, feature='pair'):
+def instance(k, classifier='logistic', dim_reduction='pca', feature='distance'):
 	# Define a training function.
 	def train(pairs, targets, names):
 		# Create a training matrix.
@@ -44,10 +44,13 @@ def instance(k, classifier='logistic', fisher=False, feature='pair'):
 		# Create a transformer.
 		t0 = time()
 		perror('Finding the basis for dimensionality reduction.')
-		if fisher:
+		if dim_reduction == 'fisher':
 			transformer = fisher_transformer(P, N, k)
-		else:
+		elif dim_reduction == 'pca':
 			transformer = pca_transformer(P, k, save=False)
+		elif dim_reduction.startswith('fisher_pca'):
+			pca_k = int(dim_reduction.rsplit('_', 1)[1])
+			transformer = fisher_transformer(P, N, k, pca_first=pca_k)
 		perror('Found the basis in %.3f seconds' % (time() - t0))
 
 		# Transform the training data and put it back into pairs.
@@ -104,6 +107,13 @@ def instance(k, classifier='logistic', fisher=False, feature='pair'):
 
 	return train, same_or_different
 
+
+# Some tests to try:
+# 1) Push PCA with a variable number of components, cranking up the resolution.
+# 2) Try cropping. You can crop down to (115, 250) and still get decent results.
+# 3) Try with Fisher alone. Fisher seems to benefit from small feature spaces. Try with resize=.1
+# 4) Try PCA followed by Fisher. 100 components at resize=.3 and crop=(115, 250) seemed to get about
+#    75% accuracy on the first fold of LFW.
 #train, test = create_train_test(50)
 #print(load_lfw.run_test_unrestricted(1, train, test, type='funneled', resize=.3, color=False))
 
