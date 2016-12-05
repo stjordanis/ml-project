@@ -176,6 +176,21 @@ def load_pairs(type, resize=None, folds=10, color=False, crop=None):
 # the same person and False otherwise.
 # If pairwise == False, then outcome_fn takes one face and returns the name associated with
 # it (or None if it doesn't belong to any trained identity).
+# {folds} is the number of cross-validation runs. Set it to 1 for development and 10 for testing.
+# {train_fn} Generates the model. It's a function that takes three arguments:
+#     {pairs}: a list of pairs of faces (as 2D numpy arrays - 3D if you use color)
+#     {targets}: a list of booleans indicating whether the faces are the same
+#     {names}: a list of pairs of strings (the names associated with the faces)
+# {outcome_fn}: Returns true or false depending on whether faces match or not.
+#     {face1},{face2}: The two faces.
+#     {trained}: Whatever train_fn returned.
+# {type}: Whether to use pre-aligned images. Always set this to "funneled"
+# {resize}: A float between 0 and 1 specifying the resizing factor of the image.
+#           I've generally used somewhere between between .1 and .4
+# {color}: A boolean indicating whether to produce color images or not.
+# {crop}: A tuple of two integers specifying the width and height that you want
+#         to crop the image into. Crop runs before resize. A good value is
+#         (150, 250) or (115, 250).
 def run_test(folds, train_fn, outcome_fn, type, resize, color, crop=None):
 	sets = load_pairs(type, resize=resize, folds=10, color=color, crop=crop)
 	success = 0
