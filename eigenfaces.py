@@ -36,10 +36,11 @@ def instance(k, classifier='logistic', dim_reduction='pca', feature='distance'):
 		perror(len(pairs))
 		w, h = pairs[0][0].shape[:2]
 		perror('Running on %d pairs of images with resolution %d x %d' % (n, w, h))
-
+		perror('Overall shape of each image: %s' % (str(pairs[0][0].shape)))
 		# Prepare to perofrm dimensionality reduction.
 		P = np.array(pairs).reshape([2*n, -1])
 		N = np.ravel(np.array(names))
+		perror('Shape of numpy array of images: %s' % str(P.shape))
 
 		# Create a transformer.
 		t0 = time()
@@ -114,6 +115,7 @@ def instance(k, classifier='logistic', dim_reduction='pca', feature='distance'):
 # 3) Try with Fisher alone. Fisher seems to benefit from small feature spaces. Try with resize=.1
 # 4) Try PCA followed by Fisher. 100 components at resize=.3 and crop=(115, 250) seemed to get about
 #    75% accuracy on the first fold of LFW.
+# 5) Best results: Color=True, resize=.15, dim_reduction=fisher_pca_100, k=5
 #train, test = create_train_test(50)
 #print(load_lfw.run_test_unrestricted(1, train, test, type='funneled', resize=.3, color=False))
 

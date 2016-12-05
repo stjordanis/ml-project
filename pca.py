@@ -107,7 +107,7 @@ class fisher_transformer:
 		perror('features: %d' % d)
 
 		# Calculate a centered matrix.
-		Z = np.zeros(X.shape, dtype=float64)
+		Z = np.zeros(X.shape, dtype=np.float64)
 		for i in range(n):
 			Z[i] = X[i] - means[y[i]]
 		Z = Z / d
