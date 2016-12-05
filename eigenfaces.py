@@ -4,15 +4,10 @@
 # Performs facial recognition on the LFW dataset using PCA and the    #
 # eigenfaces algorithm.                                               #
 #######################################################################
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import classification_report
-from sklearn.metrics.pairwise import pairwise_distances
 import numpy as np
 import sklearn
 
 from sklearn.linear_model import LogisticRegression as lr
-from sklearn.neighbors import KNeighborsClassifier as knn
 
 
 from pca import pca_transformer, fisher_transformer
