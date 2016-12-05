@@ -42,7 +42,7 @@ def download(type='funneled'):
 	# Download the pairs file.
 	if not(os.path.exists(os.path.join(path, 'pairs.txt'))):
 		r = requests.get(PAIRS_URL)
-		f = open(os.path.join(path, 'pairs.txt'), 'w')
+		f = open(os.path.join(path, 'pairs.txt'), 'wb')
 		f.write(r.content)
 		f.close()
 
