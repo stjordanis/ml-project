@@ -21,7 +21,7 @@ num_images, h, w = lfw_people.images.shape
 X = lfw_people.data
 num_features = X.shape[1]
 
-# Extract hte target data.
+# Extract the target data.
 target_names = lfw_people.target_names
 num_classes = target_names.shape[0]
 t = np.zeros([num_images, num_classes])
@@ -38,7 +38,26 @@ X_train, X_test, t_train, t_test = train_test_split(X, t, test_size=0.25, random
 ###############################################################################
 #   NEURAL NETWORK CONSTANTS                                                  #
 ###############################################################################
+# HYPERPARAMETERS
+NUM_TRAINING_STEPS = 1000
+
 batch_size = 20
+learning_rate = 0.01
+NUM_CHANNELS = 1
+layer1_filter_size = 5
+layer1_depth = 32
+
+layer1_pool_filter_size = 2
+layer1_pool_stride = 2
+
+layer2_pool_filter_size = 2
+layer2_pool_stride = 2
+
+layer2_filter_size = 5
+layer2_depth = 64
+
+fully_connected_nodes = 100
+
 
 def weight_variable(shape):
     initial = tf.truncated_normal(shape, stddev=.1)
@@ -51,7 +70,7 @@ def bias_variable(shape):
 def conv(x, W, sw=1, sh=1):
     return tf.nn.conv2d(x, W, strides=[sw, sh, 1, 1], padding='SAME')
 
-def max_pool(x, w=2, h=2, sw=2, sh=2):
+def max_pool(x, w, h, sw, sh):
     return tf.nn.max_pool(x, ksize=[1, w, h, 1], strides=[1, sw, sh, 1], padding='SAME')
 
 ###############################################################################
@@ -65,29 +84,29 @@ print("input_layer_2d.get_shape():")
 print(input_layer_2d.get_shape())
 
 # Convolutional layer.
-W_conv1 = weight_variable([5, 5, 1, 32])
-b_conv1 = bias_variable([32])
+W_conv1 = weight_variable([layer1_filter_size, layer1_filter_size, 1, layer1_depth])
+b_conv1 = bias_variable([layer1_depth])
 h_conv1 = tf.nn.relu(conv(input_layer_2d, W_conv1) + b_conv1)
 
 print("h_conv1.get_shape()")
 print(h_conv1.get_shape())
 
 # Pooling layer.
-h_pool1 = max_pool(h_conv1, w=2, h=2, sw=2, sh=2)
+h_pool1 = max_pool(h_conv1, w=layer1_pool_filter_size, h=layer1_pool_filter_size, sw=layer1_pool_stride, sh=layer1_pool_stride)
 
 print("h_pool1.get_shape()")
 print(h_pool1.get_shape())
 
 # Convolutional layer.
-W_conv2 = weight_variable([5, 5, 32, 64])
-b_conv2 = bias_variable([64])
+W_conv2 = weight_variable([layer2_filter_size, layer2_filter_size, layer1_depth, layer2_depth])
+b_conv2 = bias_variable([layer2_depth])
 h_conv2 = tf.nn.relu(conv(h_pool1, W_conv2) + b_conv2)
 
 print("h_conv2.get_shape()")
 print(h_conv2.get_shape())
 
 # Pooling layer.
-h_pool2 = max_pool(h_conv2, w=2, h=2, sw=2, sh=2)
+h_pool2 = max_pool(h_conv2, w=layer2_pool_filter_size, h=layer2_pool_filter_size, sw=layer2_pool_stride, sh=layer2_pool_stride)
 _, pool2w, pool2h, pool2d = h_pool2.get_shape().as_list()
 units = pool2w * pool2h * pool2d
 h_pool2_flat = tf.reshape(h_pool2, [-1, units])
@@ -96,15 +115,15 @@ print("h_pool2_flat.get_shape()")
 print(h_pool2_flat.get_shape())
 
 # Fully connected layer.
-W_fc1 = weight_variable([units, 100])
-b_fc1 = bias_variable([100])
+W_fc1 = weight_variable([units, fully_connected_nodes])
+b_fc1 = bias_variable([fully_connected_nodes])
 h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
 
 print("h_fc1.get_shape()")
 print(h_fc1.get_shape())
 
 # Output layer.
-W_output = weight_variable([100, num_classes])
+W_output = weight_variable([fully_connected_nodes, num_classes])
 b_output = bias_variable([num_classes])
 output_layer = tf.matmul(h_fc1, W_output) + b_output
 
@@ -137,7 +156,7 @@ init = tf.initialize_all_variables()
 sess = tf.Session()
 sess.run(init)
 t0=time()
-for i in range(1000):
+for i in range(NUM_TRAINING_STEPS):
     idxs = np.arange(0, t_train.shape[0])
     np.random.shuffle(idxs)
     
