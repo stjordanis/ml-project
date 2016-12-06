@@ -8,11 +8,14 @@ from sklearn.metrics import confusion_matrix
 
 import tensorflow as tf
 import numpy as np
+import load_lfw
 
 ##############################################################################
 #   DATA WRANGLING                                                           #
 ##############################################################################
-lfw_people = fetch_lfw_people(min_faces_per_person=50, resize=0.4)
+#lfw_people = fetch_lfw_people(min_faces_per_person=50, resize=0.4)
+lfw_people = load_pairs()
+print(lfw_people)
 
 # Find the shapes of the images.
 num_images, h, w = lfw_people.images.shape
@@ -23,7 +26,12 @@ num_features = X.shape[1]
 
 # Extract the target data.
 target_names = lfw_people.target_names
-num_classes = target_names.shape[0]
+# num_classes = target_names.shape[0]
+num_classes = 1 # since we are classifying whether the people are the same or different
+print("num_classes = ", num_classes)
+
+# TODO logic here to account for pairs 
+
 t = np.zeros([num_images, num_classes])
 t[np.arange(num_images), lfw_people.target] = 1
 
@@ -41,20 +49,23 @@ X_train, X_test, t_train, t_test = train_test_split(X, t, test_size=0.25, random
 # HYPERPARAMETERS
 NUM_TRAINING_STEPS = 1000
 
-batch_size = 20
-learning_rate = 0.01
+batch_size = 30
+learning_rate = 1e-4
 NUM_CHANNELS = 1
 layer1_filter_size = 5
 layer1_depth = 32
-
-layer1_pool_filter_size = 2
-layer1_pool_stride = 2
-
-layer2_pool_filter_size = 2
-layer2_pool_stride = 2
-
 layer2_filter_size = 5
 layer2_depth = 64
+
+layer1_stride = 2
+layer2_stride = 2
+
+layer1_pool_filter_size = 2
+layer1_pool_stride = 1
+
+layer2_pool_filter_size = 2
+layer2_pool_stride = 1
+
 
 fully_connected_nodes = 100
 
@@ -67,8 +78,8 @@ def bias_variable(shape):
     initial = tf.constant(.1, shape=shape)
     return tf.Variable(initial)
 
-def conv(x, W, sw=1, sh=1):
-    return tf.nn.conv2d(x, W, strides=[sw, sh, 1, 1], padding='SAME')
+def conv(x, W, sw, sh):
+    return tf.nn.conv2d(x, W, strides=[sw, sh, 1, 1], padding='SAME') # should this be [1, sw, sh, 1]
 
 def max_pool(x, w, h, sw, sh):
     return tf.nn.max_pool(x, ksize=[1, w, h, 1], strides=[1, sw, sh, 1], padding='SAME')
@@ -83,16 +94,16 @@ input_layer_2d = tf.reshape(input_layer, [-1, w, h, 1])
 print("input_layer_2d.get_shape():")
 print(input_layer_2d.get_shape())
 
-# Convolutional layer.
+# Convolutional layer 1
 W_conv1 = weight_variable([layer1_filter_size, layer1_filter_size, 1, layer1_depth])
 b_conv1 = bias_variable([layer1_depth])
-h_conv1 = tf.nn.relu(conv(input_layer_2d, W_conv1) + b_conv1)
+h_conv1 = tf.nn.relu(conv(input_layer_2d, W_conv1, layer1_stride, layer1_stride) + b_conv1)
 
 print("h_conv1.get_shape()")
 print(h_conv1.get_shape())
 
-# Pooling layer.
-h_pool1 = max_pool(h_conv1, w=layer1_pool_filter_size, h=layer1_pool_filter_size, sw=layer1_pool_stride, sh=layer1_pool_stride)
+# Pooling layer 1
+h_conv1 = max_pool(h_conv1, w=layer1_pool_filter_size, h=layer1_pool_filter_size, sw=layer1_pool_stride, sh=layer1_pool_stride)
 
 print("h_pool1.get_shape()")
 print(h_pool1.get_shape())
@@ -100,13 +111,13 @@ print(h_pool1.get_shape())
 # Convolutional layer.
 W_conv2 = weight_variable([layer2_filter_size, layer2_filter_size, layer1_depth, layer2_depth])
 b_conv2 = bias_variable([layer2_depth])
-h_conv2 = tf.nn.relu(conv(h_pool1, W_conv2) + b_conv2)
+h_conv2 = tf.nn.relu(conv(h_conv1, W_conv2) + b_conv2)
 
 print("h_conv2.get_shape()")
 print(h_conv2.get_shape())
 
 # Pooling layer.
-h_pool2 = max_pool(h_conv2, w=layer2_pool_filter_size, h=layer2_pool_filter_size, sw=layer2_pool_stride, sh=layer2_pool_stride)
+h_conv2 = max_pool(h_conv2, w=layer2_pool_filter_size, h=layer2_pool_filter_size, sw=layer2_pool_stride, sh=layer2_pool_stride)
 _, pool2w, pool2h, pool2d = h_pool2.get_shape().as_list()
 units = pool2w * pool2h * pool2d
 h_pool2_flat = tf.reshape(h_pool2, [-1, units])
@@ -125,19 +136,21 @@ print(h_fc1.get_shape())
 # Output layer.
 W_output = weight_variable([fully_connected_nodes, num_classes])
 b_output = bias_variable([num_classes])
-output_layer = tf.matmul(h_fc1, W_output) + b_output
+output_layer = tf.sigmoid(tf.matmul(h_fc1, W_output) + b_output)
 
 print("output_layer.get_shape()")
 print(output_layer.get_shape())
 
 # Layer storing the actual target values.
 target_layer = tf.placeholder(tf.float32, [None, num_classes])
+# TODO -- load this?
+
 
 # The loss function.
 cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(output_layer, target_layer))
 
 # The training step.
-train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
 
 ###############################################################################
 #   CALCULATE ACCURACY                                                        #
