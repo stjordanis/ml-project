@@ -24,7 +24,7 @@ def type_to_paths(type):
 	# Create the path to the file.
 	if type == 'funneled':
 		subdir, url = FUNNELED_DIR, FUNNELED_URL
-	elif type == 'normal':
+	else:
 		subdir, url = NORMAL_DIR, NORMAL_URL
 
 	return subdir, url
@@ -128,7 +128,7 @@ def get_these_images(images, type, resize, color, crop):
 
 	return faces
 
-def load_pairs(type, resize=None, folds=10, color=False, crop=None):
+def load_pairs(type, resize=None, folds=1, color=False, crop=None):
 	download(type)
 	pairs = open(os.path.join('.', LFW_DIR, 'pairs.txt')).readlines()[1:]
 
@@ -147,9 +147,10 @@ def load_pairs(type, resize=None, folds=10, color=False, crop=None):
 		face = get_these_images([filename], type, resize, color, crop)[0]
 		retrieved[name + str(num)] = face
 		return (name, num, face)
-
+	print("retrieved. starting to load")
 	# Load.
 	for set in range(folds):
+		print("new iteration")
 		new_set = []
 
 		# Extract match pairs.
@@ -164,11 +165,13 @@ def load_pairs(type, resize=None, folds=10, color=False, crop=None):
 		for unmatch_pair in range(300, 600):
 			i = set * 600 + unmatch_pair
 			name1, x1, name2, x2 = pairs[i].split()
+			#print(name1, " ", name2)
 			f1, f2 = retrieve(name1, x1), retrieve(name2, x2)
+			#print(f1, " " , f2)
 			new_set.append((f1, f2))
 
 		sets.append(new_set)
-
+		print("appended new set")
 	return sets
 
 # Pairwise determines whether we run a verification regime or n individual classification

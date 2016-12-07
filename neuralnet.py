@@ -14,34 +14,62 @@ import load_lfw
 #   DATA WRANGLING                                                           #
 ##############################################################################
 #lfw_people = fetch_lfw_people(min_faces_per_person=50, resize=0.4)
-lfw_people = load_pairs()
-print(lfw_people)
-
+lfw_people = load_lfw.load_pairs(type='funneled')
+#print(lfw_people)
+fold0 = lfw_people[0]
 # Find the shapes of the images.
-num_images, h, w = lfw_people.images.shape
-
+#num_images, h, w = lfw_people.images.shape
+#print(fold0)
 # Extract the input to the neural network and the number of features.
-X = lfw_people.data
+#X = lfw_people.data
+#print(X)
+target_names = np.asarray([(fold0[x][0][0], fold0[x][1][0]) for x in range(len(fold0))])
+print(target_names)
+print(target_names.shape)
+print([fold0[x][y][0] for x in range(len(fold0)) for y in range(0,2)])
+target_nums = np.asarray([int(x==y) for (x,y) in target_names])
+target_nums = np.reshape(target_nums, (600,1))
+print(target_nums.shape)
+data = []
+for x in range(len(fold0)):
+	data.append((np.ravel(fold0[x][0][2]),np.ravel(fold0[x][1][2])))
+X = np.asarray(data)
+images =np.asarray([(fold0[x][0][2], fold0[x][1][2]) for x in range(len(fold0))])
+#X = np.asarray([fold0[x][y][2] for x in range(len(fold0)) for y in range(0,2)])
+#X = np.ravel(X)
+# (1200, 250, 250)
 num_features = X.shape[1]
-
+print("num_features = ", num_features)
+print("num_features = ", num_features)
+print(X.shape)
+print(images.shape) 
+num_pairs = images.shape[0]
+h = images.shape[2]
+w = images.shape[3]
 # Extract the target data.
-target_names = lfw_people.target_names
+#target_names = lfw_people.target_names
+#lfw_people = load_lfw.load_pairs()
 # num_classes = target_names.shape[0]
-num_classes = 1 # since we are classifying whether the people are the same or different
+num_classes = 2 # since we are classifying whether the people are the same or different
 print("num_classes = ", num_classes)
 
 # TODO logic here to account for pairs 
 
-t = np.zeros([num_images, num_classes])
-t[np.arange(num_images), lfw_people.target] = 1
+t = np.zeros([num_pairs, num_classes])
+#print(np.arange(num_pairs))
+t[np.arange(num_pairs), target_nums] = 1
 
 print("Total dataset size:")
-print("#images: %d" % num_images)
+print("#image pairs: %d" % num_pairs)
 print("#pixels: %d" % num_features)
 print("#identities: %d" % num_classes)
 
 # Create training and test sets.
 X_train, X_test, t_train, t_test = train_test_split(X, t, test_size=0.25, random_state=0)
+print("t_train.shape = ", t_train.shape)
+print("X_train.shape = ", X_train.shape)
+print("X_test.shape = ", X_test.shape)
+print("t_test.shape = ", t_test.shape)
 
 ###############################################################################
 #   NEURAL NETWORK CONSTANTS                                                  #
@@ -105,19 +133,19 @@ print(h_conv1.get_shape())
 # Pooling layer 1
 h_conv1 = max_pool(h_conv1, w=layer1_pool_filter_size, h=layer1_pool_filter_size, sw=layer1_pool_stride, sh=layer1_pool_stride)
 
-print("h_pool1.get_shape()")
-print(h_pool1.get_shape())
+#print("h_pool1.get_shape()")
+#print(h_pool1.get_shape())
 
 # Convolutional layer.
 W_conv2 = weight_variable([layer2_filter_size, layer2_filter_size, layer1_depth, layer2_depth])
 b_conv2 = bias_variable([layer2_depth])
-h_conv2 = tf.nn.relu(conv(h_conv1, W_conv2) + b_conv2)
+h_conv2 = tf.nn.relu(conv(h_conv1, W_conv2, layer2_stride, layer2_stride) + b_conv2)
 
 print("h_conv2.get_shape()")
 print(h_conv2.get_shape())
 
 # Pooling layer.
-h_conv2 = max_pool(h_conv2, w=layer2_pool_filter_size, h=layer2_pool_filter_size, sw=layer2_pool_stride, sh=layer2_pool_stride)
+h_pool2 = max_pool(h_conv2, w=layer2_pool_filter_size, h=layer2_pool_filter_size, sw=layer2_pool_stride, sh=layer2_pool_stride)
 _, pool2w, pool2h, pool2d = h_pool2.get_shape().as_list()
 units = pool2w * pool2h * pool2d
 h_pool2_flat = tf.reshape(h_pool2, [-1, units])
