@@ -38,7 +38,7 @@ images =np.asarray([(fold0[x][0][2], fold0[x][1][2]) for x in range(len(fold0))]
 #X = np.asarray([fold0[x][y][2] for x in range(len(fold0)) for y in range(0,2)])
 #X = np.ravel(X)
 # (1200, 250, 250)
-num_features = X.shape[1]
+num_features = X.shape[2] #should be 62500
 print("num_features = ", num_features)
 print("num_features = ", num_features)
 print(X.shape)
@@ -65,11 +65,17 @@ print("#pixels: %d" % num_features)
 print("#identities: %d" % num_classes)
 
 # Create training and test sets.
-X_train, X_test, t_train, t_test = train_test_split(X, t, test_size=0.25, random_state=0)
+X_train, X_test, t_train, t_test = train_test_split(images, t, test_size=0.25, random_state=0)
 print("t_train.shape = ", t_train.shape)
 print("X_train.shape = ", X_train.shape)
 print("X_test.shape = ", X_test.shape)
 print("t_test.shape = ", t_test.shape)
+'''
+t_train.shape =  (450, 2)
+X_train.shape =  (450, 2, 62500)
+X_test.shape =  (150, 2, 62500)
+t_test.shape =  (150, 2)
+'''
 
 ###############################################################################
 #   NEURAL NETWORK CONSTANTS                                                  #
@@ -116,8 +122,10 @@ def max_pool(x, w, h, sw, sh):
 #   BUILD THE NEURAL NETWORK                                                  #
 ###############################################################################
 # Input layer.
-input_layer = tf.placeholder(tf.float32, [None, w * h])
-input_layer_2d = tf.reshape(input_layer, [-1, w, h, 1])
+input_layer = tf.placeholder(tf.float32, [None, 2, w, h])
+# input_layer = tf.placeholder(tf.float32, [None, w * h])
+# input_layer_2d = tf.reshape(input_layer, [-1, w, h, 1])
+input_layer_2d = tf.reshape(input_layer, [-1, 2 * w, h])
 
 print("input_layer_2d.get_shape():")
 print(input_layer_2d.get_shape())
@@ -200,9 +208,20 @@ t0=time()
 for i in range(NUM_TRAINING_STEPS):
     idxs = np.arange(0, t_train.shape[0])
     np.random.shuffle(idxs)
-    
+    # ValueError: Cannot feed value of shape (30, 2, 62500) for Tensor 'Placeholder:0', which has shape '(?, 62500)'
+    '''
+X_train.shape =  (450, 2, 62500)
+X_test.shape =  (150, 2, 62500)
+t_train.shape =  (450, 2)
+t_test.shape =  (150, 2)
+
+X_batch.shape =  (30, 2, 62500)
+t_batch.shape =  (30, 2)
+'''
     X_batch = X_train[idxs[:batch_size]]
     t_batch = t_train[idxs[:batch_size]]
+    print("X_batch.shape = ", X_batch.shape)
+    print("t_batch.shape = ", t_batch.shape)
     sess.run(train_step, feed_dict={target_layer:t_batch, input_layer:X_batch})
     
     if i % 10 == 9:
