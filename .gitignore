@@ -2,3 +2,4 @@ __pycache__
 .lfw
 logs
 *.swp
+*.npy

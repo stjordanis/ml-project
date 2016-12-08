@@ -24,28 +24,30 @@ def max_pool(x, w=2, h=2, sw=2, sh=2):
 ##############################################################################
 # TRAINING FUNCTION                                                          #
 ##############################################################################
-def generate_model(embedding, width, height, style='pairwise', color=False):
+def generate_model(embedding, width, height, iterations, batch_size=1, style='pairwise', color=False):
     def train_fn(pairs, targets, names):
         ######################################################################
         # Initial bookkeeping.                                               #
         ######################################################################
         # Determine the list of identities and index by identities.
-        by_name = {}
-        name_to_id = {}
-        x = 0
+        name_to_face = {}
+
         for ps, ns in zip(pairs, names):
             for (p, n) in zip(ps, ns):
-                if n not in by_name:
-                    by_name[n] = []
-                    name_to_id[n] = x
-                    x += 1
-                by_name[n].append(p)
-        num_names = len(by_name.keys())
+                if n not in name_to_face:
+                    name_to_face[n] = []
+                name_to_face[n].append(p)
+        num_names = len(name_to_face.keys())
+        num_faces = len(pairs)*2
+        num_pairs = len(pairs)
 
-        def name_to_onehot(name):
-            a = np.zeros([1, num_names])
-            a[0][name_to_id[name]] = 1
-            return a
+        # Determine which faces have parntners.
+        have_partners = []
+        for i in range(num_pairs):
+            for j in range(2):
+                name = names[i][j]
+                if len(name_to_face[name]) > 1:
+                    have_partners.append((i, j))
 
         ######################################################################
         # Build the neural net.                                              #
@@ -66,8 +68,8 @@ def generate_model(embedding, width, height, style='pairwise', color=False):
             input_layer2 = tf.placeholder(tf.float32, [None, width, height, depth])
 
             # First convolutional layer.
-            conv1_w = weight_variable([5, 5, 1, 16])
-            conv1_b = bias_variable([16])
+            conv1_w = weight_variable([5, 5, 1, 32])
+            conv1_b = bias_variable([32])
             conv1_h1 = tf.nn.relu(conv(input_layer1, conv1_w) + conv1_b)
             conv1_h2 = tf.nn.relu(conv(input_layer2, conv1_w) + conv1_b)
 
@@ -76,8 +78,8 @@ def generate_model(embedding, width, height, style='pairwise', color=False):
             pool1_h2 = max_pool(conv1_h2, w=2, h=2, sw=2, sh=2)
 
             # Second convolutional layer.
-            conv2_w = weight_variable([5, 5, 16, 32])
-            conv2_b = bias_variable([32])
+            conv2_w = weight_variable([5, 5, 32, 64])
+            conv2_b = bias_variable([64])
             conv2_h1 = tf.nn.relu(conv(pool1_h1, conv2_w) + conv2_b)
             conv2_h2 = tf.nn.relu(conv(pool1_h2, conv2_w) + conv2_b)
 
@@ -127,71 +129,78 @@ def generate_model(embedding, width, height, style='pairwise', color=False):
             t0 = time()
             t1 = t0
 
-            # Permute the data in various ways.
-            pairs_rev = []
-            for (a, b) in pairs:
-                pairs_rev.append((b, a))
-            pairs = list(pairs) + pairs_rev
-            targets = list(targets) + list(targets)
+            # Train.
+            batch_face1 = []
+            batch_face2 = []
+            batch_target = []
+            batch_boolean = []
+            for i in range(iterations):
 
-            # Randomize the order of the examples.
-            pairs_np = np.array(pairs)
-            targets_np = np.array(targets)
-            perm = np.random.permutation(len(pairs))
-            pairs_np = pairs_np[perm]
-            targets_np = targets_np[perm]
-            pos = 0
-            neg = 0
-
-            # Train on every pair.
-            for i in range(len(pairs)*2):
-                j = i % len(pairs)
-                p1, p2 = pairs_np[j]
-
-                # Run the first image through the network.
-                with graph.as_default():
-                    # Run the first image through the network.
-                    inp1 = p1.reshape([1, width, height, 1])
-                    inp2 = p2.reshape([1, width, height, 1])
-
-                    # Train the network based on the second image.
-                    feed = {}
-                    feed[input_layer1] = inp1
-                    feed[input_layer2] = inp2
-                    if targets_np[j]: feed[target_inputs] = np.array([1])
-                    else: feed[target_inputs] = np.array([-1])
-
-                    # For tensorboard.
-                    if targets_np[j] == True:
-                        _, s, l = sess.run([pairwise_train, loss_sum_same, l2norm_sum_same], feed_dict=feed)
+                for j in range(batch_size):
+                    # 1) Decide whether we're going to pick the same person.
+                    same = np.random.binomial(1, .5) == 1
+                    batch_boolean.append(same)
+                    if same:
+                        batch_target.append(1)
                     else:
-                        _, s, l = sess.run([pairwise_train, loss_sum_diff, l2norm_sum_diff], feed_dict=feed)
+                        batch_target.append(-1)
 
-                    writer.add_summary(s, i)
-                    writer.add_summary(l, i)
+                    # 2) Decide on the first person to use. If we're picking
+                    #    the same person, loop until we find a face that has
+                    #    a pair in the training set.
+                    if same:
+                        first_row, first_col = have_partners[np.random.randint(0, len(have_partners))]
+                    else:
+                        first_row = np.random.randint(0, num_pairs)
+                        first_col = np.random.binomial(1, .5)
+                    face1 = pairs[first_row][first_col]
+                    batch_face1.append(face1.reshape([width, height, depth]))
+
+                    # 3) Decide on the second person to use.
+                    if same:
+                        name = names[first_row][first_col]
+                        partners = name_to_face[name]
+                        face2 = partners[np.random.randint(0, len(partners))]
+                    else:
+                        second_row = np.random.randint(0, num_pairs)
+                        second_col = np.random.binomial(1, .5)
+                        face2 = pairs[second_row][second_col]
+                    batch_face2.append(face2.reshape([width, height, depth]))
+
+                # Feed dictionary.
+                lo, hi = i*batch_size, (i+1)*batch_size
+                batch_face1np = np.array(batch_face1[lo:hi])
+                batch_face2np = np.array(batch_face2[lo:hi])
+                batch_targetnp = np.array(batch_target[lo:hi])
+                feed = {
+                    input_layer1:batch_face1np,
+                    input_layer2:batch_face2np,
+                    target_inputs:batch_targetnp
+                }
+
+                # Run the training step.
+                sess.run([pairwise_train], feed_dict=feed)
 
                 # Print useful status updates.
-                if i % 600 == 0 and i != 0:
-                    print('Trained on %d pairs in %.3f seconds.' % (i, time() - t1))
+                if i % 100 == 0 and i != 0:
+                    print('Trained on %d batches in %.3f seconds.' % (i, time() - t1))
                     t1 = time()
 
-            print('Trained on %d pairs in %.3f seconds.' % (len(pairs), time() - t0))
+            print('Done training in %.3f seconds.' % (time() - t0))
             t0 = time()
 
             # Run all images through the network.
-            print('Running all %d images through the network.' % (2 * len(pairs)))
-            p1s, p2s = zip(*pairs)
-            p1s = np.array(p1s).reshape([len(pairs), width, height, 1])
-            p2s = np.array(p2s).reshape([len(pairs), width, height, 1])
+            print('Running the %d training examples through the network.' % (iterations * batch_size))
             with graph.as_default():
-                distances = sess.run(distance_between, feed_dict={input_layer1:p1s, input_layer2:p2s})
+                feed_dict = {input_layer1:np.array(batch_face1), input_layer2:np.array(batch_face2)}
+                distances = sess.run(distance_between, feed_dict=feed_dict)
             print('Computed distances with the network in %.3f seconds.' % (time() - t0))
 
             # Calculate the average distance between same and different pairs.
             same_avg = 0
             diff_avg = 0
-            for i in range(len(targets)):
-                if targets[i]:
+            for i, b in enumerate(batch_boolean):
+                if b:
                     same_avg += distances[i]
                 else:
                     diff_avg += distances[i]
@@ -202,16 +211,16 @@ def generate_model(embedding, width, height, style='pairwise', color=False):
             # Perform logistic regression on the distances using the target values.
             print('Performing logistic regression.')
             lr = LogisticRegression()
-            lr.fit(distances.reshape(-1, 1), targets)
+            lr.fit(distances.reshape(-1, 1), np.array(batch_boolean))
             print('Logistic regression completed in %.3f seconds.' % (time() - t0))
 
             outcomes = lr.predict(distances.reshape(-1, 1))
             correct = 0
-            for i in range(len(pairs)):
-                if outcomes[i] == targets[i]:
+            for i in range(iterations*batch_size):
+                if outcomes[i] == batch_boolean[i]:
                     correct += 1
 
-            print('Error rate on training data: %f' % (correct / float(len(pairs))))
+            print('Accuracy on training data: %.3f' % (correct / float(iterations*batch_size)))
 
         return sess, graph, input_layer1, input_layer2, distance_between, lr
 
@@ -228,3 +237,4 @@ def generate_model(embedding, width, height, style='pairwise', color=False):
         return lr.predict(distance.reshape(-1, 1))[0]
 
     return train_fn, outcome_fn
+

@@ -2,6 +2,7 @@
 # LIBRARY FOR LOADING LFW AND RUNNING TESTS                           #
 #######################################################################
 
+import pickle
 import numpy as np
 import requests
 import os
@@ -204,8 +205,20 @@ def marshal_pairs(triplet_pairs):
 # {crop}: A tuple of two integers specifying the width and height that you want
 #         to crop the image into. Crop runs before resize. A good value is
 #         (150, 250) or (115, 250).
-def run_test(folds, train_fn, outcome_fn, type, resize, color, crop=None):
-    sets = load_pairs(type, resize=resize, folds=10, color=color, crop=crop)
+def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=None):
+    if file is not None and os.path.exists(file):
+        print('Loading faces from disk.')
+        fp = open(file, 'rb')
+        sets = pickle.load(fp)
+        fp.close()
+        print('Faces loaded from disk.')
+    else:
+        sets = load_pairs(type, resize=resize, folds=10, color=color, crop=crop)
+        if file is not None:
+            fp = open(file, 'wb')
+            pickle.dump(sets, fp)
+            fp.close()
+
     success = 0
     false_positive = 0
     true_positive = 0
@@ -216,7 +229,7 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, crop=None):
     # Create a holdout set.
     for test in range(folds):
         to_marshall = []
-        for i in list(range(0, test)) + list(range(test+1, len(sets))):
+        for i in list(range(0, test)) + list(range(test+1, 10)):
             to_marshall += sets[i]
 
         training_data = marshal_pairs(to_marshall)
