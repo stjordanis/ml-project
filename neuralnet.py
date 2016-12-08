@@ -14,7 +14,12 @@ import load_lfw
 #   DATA WRANGLING                                                           #
 ##############################################################################
 #lfw_people = fetch_lfw_people(min_faces_per_person=50, resize=0.4)
-lfw_people = load_lfw.load_pairs(type='funneled')
+color = False
+if color:
+    depth = 3
+else:
+    depth = 1
+lfw_people = load_lfw.load_pairs(type='funneled', color=color)
 fold0 = lfw_people[0]
 
 # Extract the input to the neural network and the number of features.
@@ -29,12 +34,14 @@ for x in range(len(fold0)):
 X = np.asarray(data)
 
 images =np.asarray([ np.concatenate((fold0[x][0][2], fold0[x][1][2]), axis=0) for x in range(len(fold0))])
-images = np.reshape(images, (600, 500, 250, 1))
+print("images.shape = " , images.shape)
+images = np.reshape(images, (600, 500, 250, depth)) #TODO hard-coded
 
 num_features = X.shape[2] #should be 62500
 num_pairs = images.shape[0]
 h = 250 # TODO hard-coded
 w = 250
+
 # Extract the target data.
 #target_names = lfw_people.target_names
 #lfw_people = load_lfw.load_pairs()
@@ -53,12 +60,16 @@ print("#identities: %d" % num_classes)
 # DOES X_train and X_test contain concatenated images??? (500, 250)
 # Create training and test sets. 
 X_train, X_test, t_train, t_test = train_test_split(images, t, test_size=0.25, random_state=0)
+print("X_train.shape = ", X_train.shape)
+print("X_test.shape = ", X_test.shape)
+print("t_train.shape = ", t_train.shape)
+print("t_test.shape = ", t_test.shape)
 
 ###############################################################################
 #   NEURAL NETWORK CONSTANTS                                                  #
 ###############################################################################
 # HYPERPARAMETERS
-NUM_TRAINING_STEPS = 500
+NUM_TRAINING_STEPS = 200
 
 batch_size = 30
 learning_rate = 1e-4
@@ -78,7 +89,7 @@ layer2_pool_filter_size = 2
 layer2_pool_stride = 1
 
 
-fully_connected_nodes = 100
+fully_connected_nodes = 30
 
 
 def weight_variable(shape):
@@ -99,7 +110,6 @@ def max_pool(x, w=2, h=2, sw=2, sh=2):
 #   BUILD THE NEURAL NETWORK                                                  #
 ###############################################################################
 # Input layer.
-depth = 1 # not doing color right now
 input_layer = tf.placeholder(tf.float32, [None, 2 * w, h, depth])
 # input_layer = tf.placeholder(tf.float32, [None, w * h])
 # input_layer_2d = tf.reshape(input_layer, [-1, w, h, 1])
@@ -109,7 +119,7 @@ print("input_layer.get_shape():")
 print(input_layer.get_shape())
 
 # Convolutional layer 1
-conv1_w = weight_variable([layer1_filter_size, layer1_filter_size, 1, layer1_depth])
+conv1_w = weight_variable([layer1_filter_size, layer1_filter_size, depth, layer1_depth]) #depth or 1?
 conv1_b = bias_variable([layer1_depth])
 conv1_h = tf.nn.relu(conv(input_layer, conv1_w) + conv1_b)
 
@@ -133,6 +143,7 @@ print(conv2_h.get_shape())
 # Pooling layer.
 pool2_h = max_pool(conv2_h, w=2, h=2, sw=1, sh=1)
 _, w, h, d = pool2_h.get_shape().as_list()
+print("d = ", d)
 pool2_h_flat = tf.reshape(pool2_h, [-1, w*h*d])
 
 
