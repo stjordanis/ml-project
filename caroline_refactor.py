@@ -73,19 +73,25 @@ def generate_model(embedding, width, height, iterations, batch_size=1, style='co
 		else:
 			depth = 1
 
+		print("DATA FORMATTING")
 		# DATA FORMATTING
 		training_faces = []
 		# concatenate pairs
 		for pair in pairs:
-			next_pair = np.concatenate((pair[0], pair[1]), axis=0)
-			training_faces.append(next_pair.reshape([width, height, depth]))
+			#print(pair[0].shape)
+			#print(pair[1].shape)
+			#print("width = ", width)
+			#print("height = ", height)
+			#print("depth = ", depth)
+			next_pair = np.concatenate((pair[0].reshape([width, height, depth]), pair[1].reshape([width, height, depth])), axis=0)
+			training_faces.append(next_pair)
 		training_faces = np.asarray(training_faces)
-
+		print("DONE CONCATENATING FACES")
 
 		with graph.as_default():
 
 			# Input layer.
-			input_layer = tf.placeholder(tf.float32, [None, 2 * w, h, depth])
+			input_layer = tf.placeholder(tf.float32, [None, 2 * width, height, depth])
 
 			print("input_layer.get_shape():")
 			print(input_layer.get_shape())
@@ -131,8 +137,8 @@ def generate_model(embedding, width, height, iterations, batch_size=1, style='co
 			print(fc1_h.get_shape())
 
 			# Output layer.
-			out_w = weight_variable([fully_connected_nodes, num_classes])
-			out_b = bias_variable([num_classes])
+			out_w = weight_variable([fully_connected_nodes, 1])
+			out_b = bias_variable([1])
 			output_layer = tf.sigmoid(tf.matmul(fc1_h, out_w) + out_b)
 			print_output = tf.Print(output_layer, [output_layer], message='Output values : ')
 
@@ -142,6 +148,7 @@ def generate_model(embedding, width, height, iterations, batch_size=1, style='co
 
 			# TODO loss functions?
 			# Layer storing the actual target values.
+
 			target_layer = tf.placeholder(tf.float32, [None, 1])
 			#print_target = tf.Print(target_layer, [target_layer], message='Target values : ')
 
@@ -155,27 +162,31 @@ def generate_model(embedding, width, height, iterations, batch_size=1, style='co
 			# Initialize the graph.
 			sess.run(tf.initialize_all_variables())
             # Run the training 
+			targets = np.asarray(targets)
+			targets = targets.reshape([5400, 1])
 			_, loss, out = sess.run([train_step, print_output, print_loss], feed_dict={target_layer:targets, input_layer:training_faces})
-    
+    		return sess, graph, input_layer, loss, output_layer
 
 	def outcome_fn(face1, face2, model):
-	    sess, graph, input_layer, loss = model
-
+		if color:
+			depth = 3
+		else:
+			depth = 1
+		sess, graph, input_layer, loss, output_layer = model
+		
 		# Run the faces through the network.
-	    with graph.as_default():
-	        face1 = face1.reshape([1, width, height, 1])
-	        face2 = face2.reshape([1, width, height, 1])
-	        next_input = concatenate_faces(face1, face2)
-	        rounded_prediction = tf.round(output_layer)
-	        out = sess.run(rounded_prediction , feed_dict={input_layer: next_input}) #TODO
+		with graph.as_default():
+
+			next_input = concatenate_faces(face1, face2, depth)
+			rounded_prediction = tf.round(output_layer)
+			out = sess.run(rounded_prediction , feed_dict={input_layer: next_input}) #TODO
 
 		# Run the prediction from the trained network
-	    return out
+		return out
 
-	def concatenate_faces(face1, face2):
-		next_pair = np.concatenate((face1, face2), axis=0)
-		return next_pair.reshape([width, height, depth])
-
+	def concatenate_faces(face1, face2, depth):
+		next_pair = np.concatenate((face1.reshape([1, width, height, depth]), face2.reshape([1, width, height, depth])), axis=1)
+		return next_pair
 
 	return train_fn, outcome_fn
 
