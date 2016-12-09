@@ -2,6 +2,7 @@
 # LIBRARY FOR LOADING LFW AND RUNNING TESTS                           #
 #######################################################################
 
+import pickle
 import numpy as np
 import requests
 import os
@@ -171,6 +172,36 @@ def load_pairs(type, resize=None, folds=1, color=False, crop=None):
 
 	return sets
 
+
+def marshal_pairs(triplet_pairs, ids=False, mirror=False, augment=False):
+    # Gather the training images.
+    names = []
+    pairs = []
+    targets = []
+    idss = []
+    for ((name1, num1, face1), (name2, num2, face2)) in triplet_pairs:
+        names.append((name1, name2))
+        pairs.append((face1, face2))
+        targets.append(name1 == name2)
+        idss.append((name1 + str(num1), name2 + str(num2)))
+
+        if mirror:
+            names.append((name1, name2))
+            pairs.append((np.fliplr(face1), np.fliplr(face2)))
+            targets.append(name1 == name2)
+            idss.append((name1 + str(num1), name2 + str(num2)))
+
+        if augment:
+            names.append((name1, name2))
+            delta = (np.random.sample() - .5)/255.
+            pairs.append((np.clip(face1+delta, 0, 1), np.clip(face2 + delta, 0, 1)))
+            targets.append(name1 == name2)
+            idss.append((name1 + str(num1), name2 + str(num2)))
+
+    if ids:
+        return (pairs, targets, names, idss)
+    return (pairs, targets, names)
+
 # Pairwise determines whether we run a verification regime or n individual classification
 # regime. If pairwise == True, then outcome_fn takes two faces and returns True if they are
 # the same person and False otherwise.
@@ -191,44 +222,93 @@ def load_pairs(type, resize=None, folds=1, color=False, crop=None):
 # {crop}: A tuple of two integers specifying the width and height that you want
 #         to crop the image into. Crop runs before resize. A good value is
 #         (150, 250) or (115, 250).
-def run_test(folds, train_fn, outcome_fn, type, resize, color, crop=None):
-	sets = load_pairs(type, resize=resize, folds=10, color=color, crop=crop)
-	success = 0
-	false_positive = 0
-	true_positive = 0
-	true_negative = 0
-	false_negative = 0
-	total = 0
+def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=None, ids=False, mirror=False, augment=False):
+    if file is not None and os.path.exists(file):
+        print('Loading faces from disk.')
+        fp = open(file, 'rb')
+        sets = pickle.load(fp)
+        fp.close()
+        print('Faces loaded from disk.')
+    else:
+        sets = load_pairs(type, resize=resize, folds=10, color=color, crop=crop)
+        if file is not None:
+            fp = open(file, 'wb')
+            pickle.dump(sets, fp)
+            fp.close()
 
-	# Create a holdout set.
-	for test in range(folds):
+    success = 0
+    false_positive = 0
+    true_positive = 0
+    true_negative = 0
+    false_negative = 0
+    total = 0
 
-		# Gather the training images.
-		names = []
-		pairs = []
-		targets = []
-		for j in list(range(0, test)) + list(range(test+1, len(sets))):
-			for ((name1, num1, face1), (name2, num2, face2)) in sets[j]:
-				names.append((name1, name2))
-				pairs.append((face1, face2))
-				targets.append(name1 == name2)
+    # Create a holdout set.
+    for test in range(folds):
+        to_marshall = []
+        for i in list(range(0, test)) + list(range(test+1, 10)):
+            to_marshall += sets[i]
 
-		# Train the model.
-		trained = train_fn(pairs, targets, names)
+        training_data = marshal_pairs(to_marshall, ids=ids, mirror=mirror, augment=augment)
 
-		# Test the model.
-		for ((name1, num1, face1), (name2, num2, face2)) in sets[test]:
-				expected = name1 == name2
-				actual = outcome_fn(face1, face2, trained)
-				total += 1
+        # Train the model.
+        trained = train_fn(*training_data)
 
-				if expected == actual and expected:
-					true_positive += 1
-				if expected == actual and not expected:
-					true_negative += 1
-				if expected and not(actual):
-					false_negative += 1
-				if actual and not(expected):
-					false_positive += 1
+        # Test the model.
+        for ((name1, num1, face1), (name2, num2, face2)) in sets[test]:
+            expected = name1 == name2
+            actual = outcome_fn(face1, face2, trained)
+            total += 1
 
-	return {'total': total, 'true_pos' : true_positive, 'true_neg' : true_negative, 'false_pos' : false_positive, 'false_neg' : false_negative}
+            if expected == actual and expected:
+                true_positive += 1
+            if expected == actual and not expected:
+                true_negative += 1
+            if expected and not(actual):
+                false_negative += 1
+            if actual and not(expected):
+                false_positive += 1
+
+    return {'total': total, 'true_pos' : true_positive, 'true_neg' : true_negative, 'false_pos' : false_positive, 'false_neg' : false_negative}
+
+class toy_harness:
+    def __init__(self, resize):
+        sets = load_pairs('funneled', resize=resize, folds=10, color=False, crop=None)
+        to_marshal = []
+        for i in range(1, 10):
+            to_marshal += sets[i]
+        self.training_data = marshal_pairs(to_marshal)
+        self.test_data = sets[0]
+
+    def run(self, train_fn, test_fn, train_on=None):
+        if train_on is not None:
+            tr = list(zip(*list(zip(*self.training_data))[:train_on]))
+        else:
+            tr = self.training_data
+
+        model = train_fn(*tr)
+
+
+        false_positive = 0
+        true_positive = 0
+        true_negative = 0
+        false_negative = 0
+        total = 0
+
+
+        for ((name1, num1, face1), (name2, num2, face2)) in self.test_data:
+            expected = name1 == name2
+            actual = test_fn(face1, face2, model)
+            total += 1
+
+            if expected == actual and expected:
+                true_positive += 1
+            if expected == actual and not expected:
+                true_negative += 1
+            if expected and not(actual):
+                false_negative += 1
+            if actual and not(expected):
+                false_positive += 1
+
+        return {'total': total, 'true_pos' : true_positive, 'true_neg' : true_negative, 'false_pos' : false_positive, 'false_neg' : false_negative}
+
