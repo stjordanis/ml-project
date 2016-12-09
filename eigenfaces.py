@@ -18,17 +18,16 @@ import mkl
 mkl.set_num_threads(16)
 import load_lfw
 from time import time
-perror = print
-
+def perror(s):
+    pass
 
 # Create a training function.
-def instance(k, classifier='logistic', dim_reduction='pca', feature='distance'):
+def instance(k, classifier='logistic', dim_reduction='pca', feature='distance', whiten=False):
 	# Define a training function.
 	def train(pairs, targets, names):
 		# Create a training matrix.
 		perror('Beginning eigenface training procedure.')
 		n = len(pairs)
-		perror(len(pairs))
 		w, h = pairs[0][0].shape[:2]
 		perror('Running on %d pairs of images with resolution %d x %d' % (n, w, h))
 		perror('Overall shape of each image: %s' % (str(pairs[0][0].shape)))
@@ -43,10 +42,10 @@ def instance(k, classifier='logistic', dim_reduction='pca', feature='distance'):
 		if dim_reduction == 'fisher':
 			transformer = fisher_transformer(P, N, k)
 		elif dim_reduction == 'pca':
-			transformer = pca_transformer(P, k, save=False)
+			transformer = pca_transformer(P, k, save=True, whiten=whiten)
 		elif dim_reduction.startswith('fisher_pca'):
 			pca_k = int(dim_reduction.rsplit('_', 1)[1])
-			transformer = fisher_transformer(P, N, k, pca_first=pca_k)
+			transformer = fisher_transformer(P, N, k, pca_first=pca_k, whiten=whiten)
 		perror('Found the basis in %.3f seconds' % (time() - t0))
 
 		# Transform the training data and put it back into pairs.

@@ -13,51 +13,58 @@
 import numpy as np
 from sklearn.utils.extmath import fast_dot
 from time import time
-perror = print
+import sys
+perror = sys.stderr.write
 import scipy.misc
 
 #######################################################################
 # A PCA TRANSFORMER                                                   #
 #######################################################################
 class pca_transformer:
-	# Assumes that the feature vectors x(i) are in rows, and each
-	# column represents a specific feature. There are n feature
-	# vectors and d features in each vector.
-	def __init__(self, X, num_components, save=False):
-		# Basic initialization.
-		n, self.d = X.shape
-		components = []
+    # Assumes that the feature vectors x(i) are in rows, and each
+    # column represents a specific feature. There are n feature
+    # vectors and d features in each vector.
+    def __init__(self, X, num_components, save=False, whiten=False):
+        # Basic initialization.
+        n, self.d = X.shape
+        components = []
 
-		# Calculate the covariance matrix.
-		self.mu = np.mean(X, axis=0)
-		Z = X - self.mu
-		A = fast_dot(Z.T, Z) / self.d
+        # Calculate the covariance matrix.
+        self.mu = np.mean(X, axis=0)
+        Z = X - self.mu
+        if False:
+            print(self.mu.shape)
+            scipy.misc.imsave(str('average.jpg'), self.mu.reshape([36, 75]))
+        A = fast_dot(Z.T, Z) / self.d
 
-		# Perform PCA.
-		i = 0
-		while len(components) < num_components:
-			eigenvector, eigenvalue = next_eigenvector(A)
-			components.append(eigenvector)
-			A = deflate(A, eigenvector, eigenvalue)
-			if save:
-				i += 1
-				scipy.misc.imsave(str(i) + '.jpg', eigenvector.reshape([75, 75]))
+        # Perform PCA.
+        i = 0
+        while len(components) < num_components:
+            eigenvector, eigenvalue = next_eigenvector(A, 1e-5)
+            if whiten:
+                components.append(eigenvector / np.sqrt(eigenvalue))
+            else:
+                components.append(eigenvector)
+            A = deflate(A, eigenvector, eigenvalue)
+            if False:
+                i += 1
+                scipy.misc.imsave(str(i) + '.jpg', eigenvector.reshape([36, 75]))
 
-		self.components = np.array(components)
+        self.components = np.array(components)
 
-	# X should be in the same form of above, or a singleton of length d.
-	def transform(self, X):
-		# Handle singleton inputs.
-		if len(X.shape) == 1:
-			X = X.reshape([1, -1])
+    # X should be in the same form of above, or a singleton of length d.
+    def transform(self, X):
+        # Handle singleton inputs.
+        if len(X.shape) == 1:
+            X = X.reshape([1, -1])
 
-		# Transform.
-		B = transform(X, self.components, self.mu)
+        # Transform.
+        B = transform(X, self.components, self.mu)
 
-		# Handle singleton outputs.
-		if len(X.shape) == 1:
-			return B[0]
-		return B
+        # Handle singleton outputs.
+        if len(X.shape) == 1:
+            return B[0]
+        return B
 
 #######################################################################
 # A FISHER TRANSFORMER                                                #
@@ -174,7 +181,6 @@ class fisher_transformer:
 				c2i[yi] = idx
 				idx += 1
 		c = len(c2i.keys())
-		print('Classes: %d' % c)
 
 		# Calculate the counts and means for each class.
 		pi = np.zeros((c, 1)) # Column vector of class counts.

@@ -224,11 +224,9 @@ def marshal_pairs(triplet_pairs, ids=False, mirror=False, augment=False):
 #         (150, 250) or (115, 250).
 def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=None, ids=False, mirror=False, augment=False):
     if file is not None and os.path.exists(file):
-        print('Loading faces from disk.')
         fp = open(file, 'rb')
         sets = pickle.load(fp)
         fp.close()
-        print('Faces loaded from disk.')
     else:
         sets = load_pairs(type, resize=resize, folds=10, color=color, crop=crop)
         if file is not None:
@@ -243,6 +241,7 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
     false_negative = 0
     total = 0
 
+    t0 = time()
     # Create a holdout set.
     for test in range(folds):
         to_marshall = []
@@ -269,7 +268,8 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
             if actual and not(expected):
                 false_positive += 1
 
-    return {'total': total, 'true_pos' : true_positive, 'true_neg' : true_negative, 'false_pos' : false_positive, 'false_neg' : false_negative}
+    t1 = time() - t0
+    return {'total': total, 'true_pos' : true_positive, 'true_neg' : true_negative, 'false_pos' : false_positive, 'false_neg' : false_negative, 'time':t1}
 
 class toy_harness:
     def __init__(self, resize):
