@@ -61,6 +61,7 @@ def max_pool(x, w=2, h=2, sw=2, sh=2):
 input_layer = tf.placeholder(tf.float32, [None, w * h])
 input_layer_2d = tf.reshape(input_layer, [-1, w, h, 1])
 
+print("input_layer_2d.get_shape():")
 print(input_layer_2d.get_shape())
 
 # Convolutional layer.
@@ -68,11 +69,13 @@ W_conv1 = weight_variable([5, 5, 1, 32])
 b_conv1 = bias_variable([32])
 h_conv1 = tf.nn.relu(conv(input_layer_2d, W_conv1) + b_conv1)
 
+print("h_conv1.get_shape()")
 print(h_conv1.get_shape())
 
 # Pooling layer.
 h_pool1 = max_pool(h_conv1, w=2, h=2, sw=2, sh=2)
 
+print("h_pool1.get_shape()")
 print(h_pool1.get_shape())
 
 # Convolutional layer.
@@ -80,6 +83,7 @@ W_conv2 = weight_variable([5, 5, 32, 64])
 b_conv2 = bias_variable([64])
 h_conv2 = tf.nn.relu(conv(h_pool1, W_conv2) + b_conv2)
 
+print("h_conv2.get_shape()")
 print(h_conv2.get_shape())
 
 # Pooling layer.
@@ -88,6 +92,7 @@ _, pool2w, pool2h, pool2d = h_pool2.get_shape().as_list()
 units = pool2w * pool2h * pool2d
 h_pool2_flat = tf.reshape(h_pool2, [-1, units])
 
+print("h_pool2_flat.get_shape()")
 print(h_pool2_flat.get_shape())
 
 # Fully connected layer.
@@ -95,6 +100,7 @@ W_fc1 = weight_variable([units, 100])
 b_fc1 = bias_variable([100])
 h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
 
+print("h_fc1.get_shape()")
 print(h_fc1.get_shape())
 
 # Output layer.
@@ -102,6 +108,7 @@ W_output = weight_variable([100, num_classes])
 b_output = bias_variable([num_classes])
 output_layer = tf.matmul(h_fc1, W_output) + b_output
 
+print("output_layer.get_shape()")
 print(output_layer.get_shape())
 
 # Layer storing the actual target values.
@@ -150,7 +157,9 @@ for i in range(1000):
 print('TEST ACCURACY: ')
 print(accuracy(X_test, t_test))
 
-
+# TODO
+# Single sigmoid output
+# anchor + match + non-match
 ###############################################################################
 #   RUN THE NEURAL NETWORK                                                    #
 ###############################################################################
