@@ -59,25 +59,25 @@ def max_pool(x, w=2, h=2, sw=2, sh=2):
 ##############################################################################
 def generate_model(embedding, width, height, iterations, batch_size=1, style='concatenated', color=False): #TODO change pairwise
 
-    def train_fn(pairs, targets, names):
+	def train_fn(pairs, targets, names):
     	# TODO initial bookkeeping
     	######################################################################
         # Build the neural net.                                              #
         ######################################################################
-        graph = tf.Graph()
-        sess = tf.Session(graph=graph)
-        writer = tf.train.SummaryWriter('logs/%d' % time(), graph)
+		graph = tf.Graph()
+		sess = tf.Session(graph=graph)
+		writer = tf.train.SummaryWriter('logs/%d' % time(), graph)
 
-        if color:
-   			depth = 3
+		if color:
+			depth = 3
 		else:
-		    depth = 1
+			depth = 1
 
 		# DATA FORMATTING
 		training_faces = []
 		# concatenate pairs
 		for pair in pairs:
-			next_pair = np.concatenate(pair[0], pair[1]), axis=0)
+			next_pair = np.concatenate((pair[0], pair[1]), axis=0)
 			training_faces.append(next_pair.reshape([width, height, depth]))
 		training_faces = np.asarray(training_faces)
 
@@ -153,7 +153,7 @@ def generate_model(embedding, width, height, iterations, batch_size=1, style='co
 			train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss_func)
 
 			# Initialize the graph.
-            sess.run(tf.initialize_all_variables())
+			sess.run(tf.initialize_all_variables())
             # Run the training 
 			_, loss, out = sess.run([train_step, print_output, print_loss], feed_dict={target_layer:targets, input_layer:training_faces})
     
@@ -173,8 +173,8 @@ def generate_model(embedding, width, height, iterations, batch_size=1, style='co
 	    return out
 
 	def concatenate_faces(face1, face2):
-		next_pair = np.concatenate(face1, face2), axis=0)
-		return next_pair.reshape([width, height, depth]))
+		next_pair = np.concatenate((face1, face2), axis=0)
+		return next_pair.reshape([width, height, depth])
 
 
 	return train_fn, outcome_fn
