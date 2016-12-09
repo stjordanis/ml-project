@@ -128,7 +128,7 @@ def get_these_images(images, type, resize, color, crop):
 
 	return faces
 
-def load_pairs(type, resize=None, folds=10, color=False, crop=None):
+def load_pairs(type, resize=None, folds=1, color=False, crop=None):
 	download(type)
 	pairs = open(os.path.join('.', LFW_DIR, 'pairs.txt')).readlines()[1:]
 
