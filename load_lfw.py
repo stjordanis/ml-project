@@ -173,16 +173,33 @@ def load_pairs(type, resize=None, folds=10, color=False, crop=None):
 	return sets
 
 
-def marshal_pairs(triplet_pairs):
+def marshal_pairs(triplet_pairs, ids=False, mirror=False, augment=False):
     # Gather the training images.
     names = []
     pairs = []
     targets = []
+    idss = []
     for ((name1, num1, face1), (name2, num2, face2)) in triplet_pairs:
         names.append((name1, name2))
         pairs.append((face1, face2))
         targets.append(name1 == name2)
+        idss.append((name1 + str(num1), name2 + str(num2)))
 
+        if mirror:
+            names.append((name1, name2))
+            pairs.append((np.fliplr(face1), np.fliplr(face2)))
+            targets.append(name1 == name2)
+            idss.append((name1 + str(num1), name2 + str(num2)))
+
+        if augment:
+            names.append((name1, name2))
+            delta = (np.random.sample() - .5)/255.
+            pairs.append((np.clip(face1+delta, 0, 1), np.clip(face2 + delta, 0, 1)))
+            targets.append(name1 == name2)
+            idss.append((name1 + str(num1), name2 + str(num2)))
+
+    if ids:
+        return (pairs, targets, names, idss)
     return (pairs, targets, names)
 
 # Pairwise determines whether we run a verification regime or n individual classification
@@ -205,7 +222,7 @@ def marshal_pairs(triplet_pairs):
 # {crop}: A tuple of two integers specifying the width and height that you want
 #         to crop the image into. Crop runs before resize. A good value is
 #         (150, 250) or (115, 250).
-def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=None):
+def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=None, ids=False, mirror=False, augment=False):
     if file is not None and os.path.exists(file):
         print('Loading faces from disk.')
         fp = open(file, 'rb')
@@ -232,7 +249,7 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
         for i in list(range(0, test)) + list(range(test+1, 10)):
             to_marshall += sets[i]
 
-        training_data = marshal_pairs(to_marshall)
+        training_data = marshal_pairs(to_marshall, ids=ids, mirror=mirror, augment=augment)
 
         # Train the model.
         trained = train_fn(*training_data)
