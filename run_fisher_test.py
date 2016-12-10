@@ -21,21 +21,22 @@ def timeout(seconds, f):
         signal.alarm(0)
     return result
 
-print('det,components,resize,color,whiten,mirror,time,true_pos,true_neg,false_pos,false_neg,total')
-for components in [10]:
-    for resize, color in [(.07, False), (.1, False), (.15, False), (.2, False), (.07, True), (.1, True)]:
+print('det,fisher_components,pca_components,resize,color,whiten,mirror,time,true_pos,true_neg,false_pos,false_neg,total')
+for (pc, fc) in [(50, 5), (100, 5), (50, 10), (100, 10)]:
+    for resize, color in [(.1, False), (.2, False), (.3, False), (.4, False), (.1, True), (.15, True), (.2, True)]:
             for whiten in [False]:
                 for mirror in [False, True]:
-                    train, test = eigenfaces.instance(components, classifier='logistic', feature='distance', dim_reduction='fisher', whiten=whiten)
+                    train, test = eigenfaces.instance(fc, classifier='logistic', feature='distance', dim_reduction='fisher_pca_%d' % pc, whiten=whiten)
                     filename = 'resize%d_color%d.npy' % (int(10 * resize), int(color))
 
                     f = partial(load_lfw.run_test, 10, train, test, 'funneled', resize, color=color, file=filename, crop=(120,250), mirror=mirror)
-                    sys.stderr.write('Components: %d, resize: %.1f, color: %d, whiten: %d, mirror: %d\n' % (components, resize, int(color), int(whiten), int(mirror)))
-                    results = timeout(180, f)
+                    sys.stderr.write('fc,pc: %d,%d, resize: %.1f, color: %d, whiten: %d, mirror: %d\n' % (fc,pc, resize, int(color), int(whiten), int(mirror)))
+                    results = timeout(360, f)
+                    #results = f()
                     true_pos = results['true_pos']
                     true_neg = results['true_neg']
                     false_pos = results['false_pos']
                     false_neg = results['false_neg']
                     total = results['total']
                     t1 = results['time']
-                    print('%d,%.2f,%d,%d,%d,%.3f,%d,%d,%d,%d,%d' % (components, resize, int(color), int(whiten), int(mirror), t1, true_pos, true_neg, false_pos, false_neg, total))
+                    print('%d,%d,%.2f,%d,%d,%d,%.3f,%d,%d,%d,%d,%d' % (fc, pc, resize, int(color), int(whiten), int(mirror), t1, true_pos, true_neg, false_pos, false_neg, total))
