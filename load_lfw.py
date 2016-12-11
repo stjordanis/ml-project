@@ -87,8 +87,8 @@ def get_these_images(images, type, resize, color, crop):
 		offw, offh = (x1 - x0 - ww)//2, (y1 - y0 - hh)//2
 		x0 += offw
 		y0 += offh
-		x1 -= offw
-		y1 -= offh
+		x1 = x0 + ww
+		y1 = y0 + hh
 
 	w = x1 - x0
 	h = y1 - y0
@@ -113,8 +113,10 @@ def get_these_images(images, type, resize, color, crop):
 			cache[os.path.basename(file)] = np.asarray(image, dtype=np.float64) / 255.
 		face = cache[os.path.basename(file)]
 
+
 		# Resize the image if requested.
-		face = face[x0:x1][y0:y1]
+		face = face[x0:x1,y0:y1]
+
 		if resize is not None:
 			face = imresize(face, resize)
 
