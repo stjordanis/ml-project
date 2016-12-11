@@ -224,7 +224,7 @@ def marshal_pairs(triplet_pairs, ids=False, mirror=False, augment=False):
 # {crop}: A tuple of two integers specifying the width and height that you want
 #         to crop the image into. Crop runs before resize. A good value is
 #         (150, 250) or (115, 250).
-def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=None, ids=False, mirror=False, augment=False):
+def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=None, ids=False, mirror=False, augment=False, roc=False):
     if file is not None and os.path.exists(file):
         fp = open(file, 'rb')
         sets = pickle.load(fp)
@@ -247,7 +247,7 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
     tr_tp = 0
     tr_fn = 0
     tr_tn = 0
-
+    roc_out = []
     t0 = time()
     # Create a holdout set.
     for test in range(folds):
@@ -265,7 +265,11 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
         # Test the model.
         for ((name1, num1, face1), (name2, num2, face2)) in sets[test]:
             expected = name1 == name2
-            actual = outcome_fn(face1, face2, trained)
+            if roc:
+                dist, actual = outcome_fn(face1, face2, trained)
+                roc_out.append((dist, expected))
+            else:
+                actual = outcome_fn(face1, face2, trained)
             total += 1
 
             if expected == actual and expected:
@@ -279,7 +283,10 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
     t1 = time() - t0
         for i, (face1, face2) in enumerate(training_data[0]):
             expected = training_data[1][i]
-            actual = outcome_fn(face1, face2, trained)
+            if roc:
+                dist, actual = outcome_fn(face1, face2, trained)
+            else:
+                actual = outcome_fn(face1, face2, trained)
             total += 1
 
             if expected == actual and expected:
@@ -296,6 +303,7 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
     out['tr_true_neg'] = tr_tn
     out['tr_false_pos'] = tr_fp
     out['tr_false_neg'] = tr_fn
+    out['roc'] = roc_out
     return out
 
 
