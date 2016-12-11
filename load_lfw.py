@@ -269,6 +269,9 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
                 false_positive += 1
 
     t1 = time() - t0
+    print ("precision = ",   float(true_positive) / (true_positive + false_positive))
+    print("recall = ", float(true_positive) / (true_positive + false_negative))
+    print("f1 score = ", 2.0*true_positive / (2.0*true_positive + false_positive + false_negative))
     return {'total': total, 'true_pos' : true_positive, 'true_neg' : true_negative, 'false_pos' : false_positive, 'false_neg' : false_negative, 'time':t1}
 
 class toy_harness:
