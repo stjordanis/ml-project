@@ -1,0 +1,4 @@
+hidden_nodes,output_nodes,resize,color,iterations,batch_size,choices,time,true_pos,true_neg,false_pos,false_neg,total,train_true_pos,train_true_neg,train_false_pos,train_false_neg
+70,10,0.12,1,2500,8,1,388.522,1645,1700,1300,1355,60000,15044,15019,11981,11956
+70,10,0.12,1,2500,8,1,385.541,1742,1575,1425,1258,60000,16000,14204,12796,11000
+70,10,0.12,1,2500,8,1,383.015,1622,1722,1278,1378,60000,14782,15561,11439,12218
