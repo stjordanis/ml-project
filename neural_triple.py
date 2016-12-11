@@ -22,6 +22,10 @@ def conv(x, W, sw=1, sh=1):
 def max_pool(x, w=2, h=2, sw=2, sh=2):
     return tf.nn.max_pool(x, ksize=[1, w, h, 1], strides=[1, sw, sh, 1], padding='SAME')
 
+def perror(s):
+    pass
+def perror2(s):
+    sys.stderr.write(s + '\n')
 ##############################################################################
 # TRAINING FUNCTION                                                          #
 ##############################################################################
@@ -95,16 +99,16 @@ def generate_model(embedding, width, height, iterations, batch_size=1, color=Fal
             pool1_h3 = max_pool(conv1_h3, w=3, h=3, sw=2, sh=2)
 
             # Second convolutional layer.
-            conv2_w = weight_variable([5, 5, 32, 64])
+            conv2_w = weight_variable([3, 3, 32, 64])
             conv2_b = bias_variable([64])
             conv2_h1 = tf.nn.relu(conv(pool1_h1, conv2_w) + conv2_b)
             conv2_h2 = tf.nn.relu(conv(pool1_h2, conv2_w) + conv2_b)
             conv2_h3 = tf.nn.relu(conv(pool1_h3, conv2_w) + conv2_b)
 
             # Pooling layer.
-            pool2_h1 = max_pool(conv2_h1, w=2, h=2, sw=1, sh=1)
-            pool2_h2 = max_pool(conv2_h2, w=2, h=2, sw=1, sh=1)
-            pool2_h3 = max_pool(conv2_h3, w=2, h=2, sw=1, sh=1)
+            pool2_h1 = max_pool(conv2_h1, w=3, h=3, sw=1, sh=1)
+            pool2_h2 = max_pool(conv2_h2, w=3, h=3, sw=1, sh=1)
+            pool2_h3 = max_pool(conv2_h3, w=3, h=3, sw=1, sh=1)
             _, w, h, d = pool2_h1.get_shape().as_list()
             pool2_h1_flat = tf.reshape(pool2_h1, [-1, w*h*d])
             pool2_h2_flat = tf.reshape(pool2_h2, [-1, w*h*d])
@@ -143,8 +147,8 @@ def generate_model(embedding, width, height, iterations, batch_size=1, color=Fal
         #####################################################################
         # Run pairwise training.                                            #
         #####################################################################
-        print('Beginning training for triplet loss.')
-        print('Training on randomly generated triplets.')
+        perror('Beginning training for triplet loss.')
+        perror('Training on randomly generated triplets.')
 
         t0 = time()
         t1 = t0
@@ -202,10 +206,10 @@ def generate_model(embedding, width, height, iterations, batch_size=1, color=Fal
 
             # Print useful status updates.
             if i % 1000 == 0 and i != 0:
-                print('Trained on %d batches in %.3f seconds.' % (i, time() - t1))
+                perror('Trained on %d batches in %.3f seconds.' % (i, time() - t1))
                 t1 = time()
 
-        print('Done training in %.3f seconds.' % (time() - t0))
+        perror2('Done training in %.3f seconds.' % (time() - t0))
         t0 = time()
 
         # Run randomly generated faces through the network.
@@ -225,32 +229,17 @@ def generate_model(embedding, width, height, iterations, batch_size=1, color=Fal
             faces2.append(index[f2])
             bools.append(same)
 
-        print('Running the %d training examples through the network.' % (iterations * batch_size))
+        perror('Running the %d training examples through the network.' % (iterations * batch_size))
         with graph.as_default():
             feed_dict = {input_layer1:np.array(faces1), input_layer2:np.array(faces2)}
             distances = sess.run(distance_between_same, feed_dict=feed_dict)
-        print('Computed distances with the network in %.3f seconds.' % (time() - t0))
-
-        # Calculate the average distance between same and different pairs.
-        same_avg, diff_avg = 0, 0
-        for i, b in enumerate(bools):
-            if b: same_avg += distances[i]
-            else: diff_avg += distances[i]
-        print('Same average: %.5f' % (same_avg / float(len(bools) / 2)))
-        print('Diff average: %.5f' % (diff_avg / float(len(bools) / 2)))
+        perror('Computed distances with the network in %.3f seconds.' % (time() - t0))
 
         # Perform logistic regression on the distances using the target values.
-        print('Performing logistic regression.')
+        perror('Performing logistic regression.')
         lr = LogisticRegression()
         lr.fit(distances.reshape(-1, 1), np.array(bools))
-        print('Logistic regression completed in %.3f seconds.' % (time() - t0))
-
-        # Test the training data.
-        outcomes = lr.predict(distances.reshape(-1, 1))
-        correct = 0
-        for i in range(num_lr):
-            if outcomes[i] == bools[i]: correct += 1
-        print('Accuracy on training data: %.3f' % (correct / float(len(bools))))
+        perror('Logistic regression completed in %.3f seconds.' % (time() - t0))
 
         return sess, graph, input_layer1, input_layer2, distance_between_same, lr
 

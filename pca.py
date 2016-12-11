@@ -149,7 +149,7 @@ class fisher_transformer:
                 #    generally works better on lower resolution. 
                 #    Initial best results: 10 components at .1 resize at (115, 250) crop.
 		perror('Determinant of Sw: %g' % np.linalg.det(Sw))
-		print('%g,' % np.linalg.det(Sw), end='')
+		#print('%g,' % np.linalg.det(Sw), end='')
 		t0 = time()
 		A = fast_dot(np.linalg.pinv(Sw), Sb)
 		perror('Inverted Sw and multiplied it by Sb in %.3f seconds.' % (time() - t0))
