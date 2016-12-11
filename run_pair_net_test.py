@@ -1,5 +1,5 @@
 import load_lfw
-import neural_pair
+import neural_pair2
 from functools import partial
 import errno, os, signal
 
@@ -21,12 +21,12 @@ def timeout(seconds, f):
         signal.alarm(0)
     return result
 
-print('hidden_nodes,output_nodes,resize,color,iterations,batch_size,choices,time,true_pos,true_neg,false_pos,false_neg,total')
-for output_size in [25]:
-	for resize, color in [(.05, False), (.1, False), (.15, False), (.2, False), (.25, False), (.3, False), (.05, True), (.1, True), (.15, True), (.2, True)]:
+print('hidden_nodes,output_nodes,resize,color,iterations,batch_size,choices,time,true_pos,true_neg,false_pos,false_neg,total,train_true_pos,train_true_neg,train_false_pos,train_false_neg')
+for output_size in [10, 25]:
+	for resize, color in [(.35, False), (.17, True)]:
 			for iterations, batch_size in [(20000, 1)]:#, (10000, 2), (5000, 4), (2500, 8), (1250, 16), (500, 40)]:
 				for choices in [1]:
-					train, test = neural_pair.generate_model(10, int(resize*120), int(resize*240), iterations=iterations, batch_size=batch_size, color=color, choices=choices, randomized_pairs=True)
+					train, test = neural_pair2.generate_model(10, int(resize*120), int(resize*240), iterations=iterations, batch_size=batch_size, color=color, consider=choices)
 					filename = 'resize%d_color%d.npy' % (int(100 * resize), int(color))
 
 					f = partial(load_lfw.run_test, 1, train, test, 'funneled', resize, color=color, file=filename, crop=(120,240), mirror=False, ids=True)
@@ -39,4 +39,4 @@ for output_size in [25]:
 					false_neg = results['false_neg']
 					total = results['total']
 					t1 = results['time']
-					print('%d,%d,%.2f,%d,%d,%d,%d,%.3f,%d,%d,%d,%d,%d' % (70, output_size, resize, int(color), iterations, batch_size, choices, t1, true_pos, true_neg, false_pos, false_neg, total))
+					print('%d,%d,%.2f,%d,%d,%d,%d,%.3f,%d,%d,%d,%d,%d,%d,%d,%d,%d' % (70, output_size, resize, int(color), iterations, batch_size, choices, t1, true_pos, true_neg, false_pos, false_neg, total, results['tr_true_pos'], results['tr_true_neg'], results['tr_false_pos'], results['tr_false_neg']))

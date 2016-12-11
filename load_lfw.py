@@ -243,6 +243,11 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
     false_negative = 0
     total = 0
 
+    tr_fp = 0
+    tr_tp = 0
+    tr_fn = 0
+    tr_tn = 0
+
     t0 = time()
     # Create a holdout set.
     for test in range(folds):
@@ -254,6 +259,8 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
 
         # Train the model.
         trained = train_fn(*training_data)
+        t1 = time() - t0
+
 
         # Test the model.
         for ((name1, num1, face1), (name2, num2, face2)) in sets[test]:
@@ -270,8 +277,27 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
             if actual and not(expected):
                 false_positive += 1
 
-    t1 = time() - t0
-    return {'total': total, 'true_pos' : true_positive, 'true_neg' : true_negative, 'false_pos' : false_positive, 'false_neg' : false_negative, 'time':t1}
+        for i, (face1, face2) in enumerate(training_data[0]):
+            expected = training_data[1][i]
+            actual = outcome_fn(face1, face2, trained)
+            total += 1
+
+            if expected == actual and expected:
+                tr_tp += 1
+            if expected == actual and not expected:
+                tr_tn += 1
+            if expected and not(actual):
+                tr_fn += 1
+            if actual and not(expected):
+                tr_fp += 1
+
+    out = {'total': total, 'true_pos' : true_positive, 'true_neg' : true_negative, 'false_pos' : false_positive, 'false_neg' : false_negative, 'time':t1}
+    out['tr_true_pos'] = tr_tp
+    out['tr_true_neg'] = tr_tn
+    out['tr_false_pos'] = tr_fp
+    out['tr_false_neg'] = tr_fn
+    return out
+
 
 class toy_harness:
     def __init__(self, resize):
