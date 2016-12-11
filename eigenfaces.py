@@ -22,7 +22,7 @@ def perror(s):
     pass
 
 # Create a training function.
-def instance(k, classifier='logistic', dim_reduction='pca', feature='distance', whiten=False):
+def instance(k, classifier='logistic', dim_reduction='pca', feature='distance', whiten=False, roc=False):
 	# Define a training function.
 	def train(pairs, targets, names):
 		# Create a training matrix.
@@ -92,6 +92,8 @@ def instance(k, classifier='logistic', dim_reduction='pca', feature='distance', 
 
 		if feature=='distance':
 			feature_vec = np.linalg.norm(f1 - f2)
+			if roc:
+				return (float(feature_vec), model.predict(feature_vec)[0])
 		elif feature=='difference':
 			feature_vec = f1 - f2
 		else:
