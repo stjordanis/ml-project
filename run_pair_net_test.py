@@ -23,7 +23,7 @@ def timeout(seconds, f):
 
 print('hidden_nodes,output_nodes,resize,color,iterations,batch_size,choices,time,true_pos,true_neg,false_pos,false_neg,total,train_true_pos,train_true_neg,train_false_pos,train_false_neg')
 for output_size in [10, 25]:
-	for resize, color in [(.35, False), (.17, True)]:
+	for resize, color in [(.17, True)]:
 			for iterations, batch_size in [(20000, 1)]:#, (10000, 2), (5000, 4), (2500, 8), (1250, 16), (500, 40)]:
 				for choices in [1]:
 					train, test = neural_pair2.generate_model(10, int(resize*120), int(resize*240), iterations=iterations, batch_size=batch_size, color=color, consider=choices)
