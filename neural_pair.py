@@ -5,6 +5,12 @@ import numpy as np
 import sys
 from sklearn.linear_model import LogisticRegression
 
+def perror(s):
+	pass
+
+def perror2(s):
+	sys.stderr.write(s + '\n')
+
 #############################################################################
 # HELPER FUNCTIONS                                                          #
 #############################################################################
@@ -70,7 +76,7 @@ def generate_model(embedding, width, height, iterations, batch_size=1, color=Fal
         ######################################################################
         graph = tf.Graph()
         sess = tf.Session(graph=graph)
-        writer = tf.train.SummaryWriter('logs/%d' % time(), graph)
+        writer = tf.train.SummaryWriter('logs/embedding%d_res%dx%d_color%d_choices%d_batchsize%d' % (embedding, width, height, int(color), choices, batch_size), graph)
 
         with graph.as_default():
             # Input layer.
@@ -78,8 +84,8 @@ def generate_model(embedding, width, height, iterations, batch_size=1, color=Fal
             input_layer2 = tf.placeholder(tf.float32, [None, width, height, depth])
 
             # First convolutional layer.
-            conv1_w = weight_variable([3, 3, depth, 16])
-            conv1_b = bias_variable([16])
+            conv1_w = weight_variable([3, 3, depth, 32])
+            conv1_b = bias_variable([32])
             conv1_h1 = tf.nn.relu(conv(input_layer1, conv1_w) + conv1_b)
             conv1_h2 = tf.nn.relu(conv(input_layer2, conv1_w) + conv1_b)
 
@@ -88,14 +94,14 @@ def generate_model(embedding, width, height, iterations, batch_size=1, color=Fal
             pool1_h2 = max_pool(conv1_h2, w=3, h=3, sw=2, sh=2)
 
             # Second convolutional layer.
-            conv2_w = weight_variable([5, 5, 16, 32])
-            conv2_b = bias_variable([32])
+            conv2_w = weight_variable([3, 3, 32, 64])
+            conv2_b = bias_variable([64])
             conv2_h1 = tf.nn.relu(conv(pool1_h1, conv2_w) + conv2_b)
             conv2_h2 = tf.nn.relu(conv(pool1_h2, conv2_w) + conv2_b)
 
             # Pooling layer.
-            pool2_h1 = max_pool(conv2_h1, w=2, h=2, sw=1, sh=1)
-            pool2_h2 = max_pool(conv2_h2, w=2, h=2, sw=1, sh=1)
+            pool2_h1 = max_pool(conv2_h1, w=3, h=3, sw=2, sh=2)
+            pool2_h2 = max_pool(conv2_h2, w=3, h=3, sw=2, sh=2)
             _, w, h, d = pool2_h1.get_shape().as_list()
             pool2_h1_flat = tf.reshape(pool2_h1, [-1, w*h*d])
             pool2_h2_flat = tf.reshape(pool2_h2, [-1, w*h*d])
@@ -137,9 +143,9 @@ def generate_model(embedding, width, height, iterations, batch_size=1, color=Fal
         #####################################################################
         # Run pairwise training.                                            #
         #####################################################################
-        print('Beginning training for pairwise loss.')
-        if randomized_pairs: print('Training on randomly generated pairs.')
-        else: print('Training on pairs from LFW.')
+        perror('Beginning training for pairwise loss.')
+        if randomized_pairs: perror('Training on randomly generated pairs.')
+        else: perror('Training on pairs from LFW.')
 
         t0 = time()
         t1 = t0
@@ -158,9 +164,13 @@ def generate_model(embedding, width, height, iterations, batch_size=1, color=Fal
                     # 1) Decide whether we're going to pick the same person.
                     same = np.random.binomial(1, .5) == 1
                     training_boolean.append(same)
-                    if same: batch_target.append(1)
-                    else: batch_target.append(-1)
-    
+                    if same: 
+                        batch_target.append(1)
+                        lf, norm = loss_sum_same, l2norm_sum_same
+                    else: 
+                        batch_target.append(-1)
+                        lf, norm = loss_sum_diff, l2norm_sum_diff
+
                     # 2) Decide who to pick.
                     if choices is not None:
                         face1, face2 = select_faces(same, partners, has_partner, index, index_keys, sess, graph, input_layer1, input_layer2, distance_between, choices=choices)
@@ -179,8 +189,11 @@ def generate_model(embedding, width, height, iterations, batch_size=1, color=Fal
                 else:
                     row = np.random.randint(0, len(pairs))
                     face1, face2 = index[ids[row][0]], index[ids[row][1]]
-                    if targets[row]: batch_target.append(1)
-                    else: batch_target.append(-1)
+                    if targets[row]:
+                        batch_target.append(1)
+                    else:
+                        batch_target.append(-1)
+                        lf, norm = loss_sum_diff, l2norm_sum_diff
                     training_boolean.append(targets[row])
 
                 # Build the proper arrays.
@@ -197,43 +210,45 @@ def generate_model(embedding, width, height, iterations, batch_size=1, color=Fal
             }
 
             # Run the training step.
-            sess.run([pairwise_train], feed_dict=feed)
+            _, a, b = sess.run([pairwise_train, lf, norm], feed_dict=feed)
+            writer.add_summary(a, i)
+            writer.add_summary(b, i)
 
             # Print useful status updates.
             if i % 1000 == 0 and i != 0:
-                print('Trained on %d batches in %.3f seconds.' % (i, time() - t1))
+                perror('Trained on %d batches in %.3f seconds.' % (i, time() - t1))
                 t1 = time()
 
-        print('Done training in %.3f seconds.' % (time() - t0))
+        perror2('Done training in %.3f seconds.' % (time() - t0))
         t0 = time()
 
         # Run all images through the network.
-        print('Running the %d training examples through the network.' % (iterations * batch_size))
+        perror('Running the %d training examples through the network.' % (iterations * batch_size))
         with graph.as_default():
             feed_dict = {input_layer1:np.array(training_face1), input_layer2:np.array(training_face2)}
             distances = sess.run(distance_between, feed_dict=feed_dict)
-        print('Computed distances with the network in %.3f seconds.' % (time() - t0))
+        perror('Computed distances with the network in %.3f seconds.' % (time() - t0))
 
         # Calculate the average distance between same and different pairs.
         same_avg, diff_avg = 0, 0
         for i, b in enumerate(training_boolean):
             if b: same_avg += distances[i]
             else: diff_avg += distances[i]
-        print('Same average: %.5f' % (same_avg / float(len(targets) / 2)))
-        print('Diff average: %.5f' % (diff_avg / float(len(targets) / 2)))
+        perror('Same average: %.5f' % (same_avg / float(len(targets) / 2)))
+        perror('Diff average: %.5f' % (diff_avg / float(len(targets) / 2)))
 
         # Perform logistic regression on the distances using the target values.
-        print('Performing logistic regression.')
+        perror('Performing logistic regression.')
         lr = LogisticRegression()
         lr.fit(distances.reshape(-1, 1), np.array(training_boolean))
-        print('Logistic regression completed in %.3f seconds.' % (time() - t0))
+        perror('Logistic regression completed in %.3f seconds.' % (time() - t0))
 
         # Test the training data.
         outcomes = lr.predict(distances.reshape(-1, 1))
         correct = 0
         for i in range(iterations*batch_size):
             if outcomes[i] == training_boolean[i]: correct += 1
-        print('Accuracy on training data: %.3f' % (correct / float(iterations*batch_size)))
+        perror('Accuracy on training data: %.3f' % (correct / float(iterations*batch_size)))
 
         return sess, graph, input_layer1, input_layer2, distance_between, lr
 

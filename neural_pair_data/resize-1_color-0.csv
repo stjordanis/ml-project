@@ -1,0 +1,3 @@
+hidden_nodes,output_nodes,resize,color,iterations,batch_size,choices,time,true_pos,true_neg,false_pos,false_neg,total
+70,10,0.10,0,20001,1,1,2355.304,1746,1550,1450,1254,6000
+70,25,0.10,0,20001,1,1,2404.931,1683,1621,1379,1317,6000

@@ -40,9 +40,9 @@ def instance(k, classifier='logistic', dim_reduction='pca', feature='distance', 
 		t0 = time()
 		perror('Finding the basis for dimensionality reduction.')
 		if dim_reduction == 'fisher':
-			transformer = fisher_transformer(P, N, k)
+			transformer = fisher_transformer(P, N, k, whiten=whiten)
 		elif dim_reduction == 'pca':
-			transformer = pca_transformer(P, k, save=True, whiten=whiten)
+			transformer = pca_transformer(P, k, whiten=whiten)
 		elif dim_reduction.startswith('fisher_pca'):
 			pca_k = int(dim_reduction.rsplit('_', 1)[1])
 			transformer = fisher_transformer(P, N, k, pca_first=pca_k, whiten=whiten)

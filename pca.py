@@ -14,7 +14,8 @@ import numpy as np
 from sklearn.utils.extmath import fast_dot
 from time import time
 import sys
-perror = sys.stderr.write
+def perror(s):
+	pass
 import scipy.misc
 
 #######################################################################
@@ -73,7 +74,7 @@ class fisher_transformer:
 	# Same as for PCA. {y} contains the corresponding classes for
 	# each value of {X}.
 	# Zheng paper is broken.
-	def __init__(self, X, y, num_components, save=False, zheng_paper=False, pca_first=None):
+	def __init__(self, X, y, num_components, save=False, zheng_paper=False, pca_first=None, whiten=False):
 		if zheng_paper:
 			self.zheng_algorithm(X, y, num_components, save)
 			return
@@ -148,6 +149,7 @@ class fisher_transformer:
                 #    generally works better on lower resolution. 
                 #    Initial best results: 10 components at .1 resize at (115, 250) crop.
 		perror('Determinant of Sw: %g' % np.linalg.det(Sw))
+		print('%g,' % np.linalg.det(Sw), end='')
 		t0 = time()
 		A = fast_dot(np.linalg.pinv(Sw), Sb)
 		perror('Inverted Sw and multiplied it by Sb in %.3f seconds.' % (time() - t0))
