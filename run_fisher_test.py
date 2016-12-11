@@ -22,10 +22,10 @@ def timeout(seconds, f):
     return result
 
 print('det,fisher_components,pca_components,resize,color,whiten,mirror,time,true_pos,true_neg,false_pos,false_neg,total')
-for (pc, fc) in [(50, 5), (100, 5), (50, 10), (100, 10)]:
-    for resize, color in [(.1, False), (.2, False), (.3, False), (.4, False), (.1, True), (.15, True), (.2, True)]:
+for (pc, fc) in [(200, 5)]:
+    for resize, color in [(.07, True)]:
             for whiten in [False]:
-                for mirror in [False, True]:
+                for mirror in [True]:
                     train, test = eigenfaces.instance(fc, classifier='logistic', feature='distance', dim_reduction='fisher_pca_%d' % pc, whiten=whiten)
                     filename = 'resize%d_color%d.npy' % (int(10 * resize), int(color))
 
