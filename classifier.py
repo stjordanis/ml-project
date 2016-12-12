@@ -56,7 +56,7 @@ def max_pool(x, w=2, h=2, sw=2, sh=2):
 ##############################################################################
 # TRAINING FUNCTION                                                          #
 ##############################################################################
-def generate_model(embedding, width, height, iterations, batch_size=1, style='concatenated', color=False): #TODO change pairwise
+def generate_model(width, height, iterations, batch_size=10, style='concatenated', color=False): #TODO change pairwise
 
 	def train_fn(pairs, targets, names):
     	# TODO initial bookkeeping
@@ -75,7 +75,7 @@ def generate_model(embedding, width, height, iterations, batch_size=1, style='co
 
 
 	#	print("training_faces.shape = ", training_faces.shape)
-		print("DONE CONCATENATING FACES")
+	#	print("DONE CONCATENATING FACES")
 
 		with graph.as_default():
 
@@ -128,15 +128,15 @@ def generate_model(embedding, width, height, iterations, batch_size=1, style='co
 
 
 		for i in range(iterations):
-			if (i%1000 == 0):
-				print("i = ", i)
 			training_faces = []
 			ts = []
 			for j in range(batch_size):
 				rand_index = np.random.randint(0,5400)
-				#print("w = ", width)
-				#print("h = ", height)
+				
 				#print(pairs[rand_index][0].shape)
+				#print("w = ", width)
+				#print("h = ", height)	
+				#print("d = ", depth)
 				next_pair = np.concatenate((pairs[rand_index][0].reshape([width, height, depth]), pairs[rand_index][1].reshape([width, height, depth])), axis=0)
 				training_faces.append(next_pair)
 				next = np.asarray(targets[rand_index])
@@ -146,7 +146,7 @@ def generate_model(embedding, width, height, iterations, batch_size=1, style='co
 			training_faces = np.asarray(training_faces)
 			ts = np.asarray(ts)
 			t = ts.reshape([batch_size,1])
-			fces = training_faces.reshape([batch_size, 2*width, height, 1])
+			fces = training_faces.reshape([batch_size, 2*width, height, depth])
 			_ = sess.run([train_step], feed_dict={target_layer:t, input_layer:fces})
 			#_, loss, out = sess.run([train_step, print_output, print_loss], feed_dict={target_layer:targets, input_layer:training_faces})
 			#_ = sess.run([train_step], feed_dict={target_layer:targets[i].reshape([1,1]), input_layer:training_faces[i].reshape([1, 50, 25, 1])})
@@ -162,7 +162,6 @@ def generate_model(embedding, width, height, iterations, batch_size=1, style='co
 		
 		# Run the faces through the network.
 		with graph.as_default():
-
 			next_input = concatenate_faces(face1, face2, depth)
 			rounded_prediction = tf.round(output_layer)
 			out = sess.run(rounded_prediction , feed_dict={input_layer: next_input}) #TODO

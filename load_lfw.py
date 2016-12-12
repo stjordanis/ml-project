@@ -256,7 +256,7 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
             to_marshall += sets[i]
 
         training_data = marshal_pairs(to_marshall, ids=ids, mirror=mirror, augment=augment)
-
+        #print(len(training_data))
         # Train the model.
         trained = train_fn(*training_data)
         t1 = time() - t0
@@ -280,8 +280,10 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
                 false_negative += 1
             if actual and not(expected):
                 false_positive += 1
-    t1 = time() - t0
+
+        
         for i, (face1, face2) in enumerate(training_data[0]):
+           # print("i = ", i)
             expected = training_data[1][i]
             if roc:
                 dist, actual = outcome_fn(face1, face2, trained)
@@ -297,6 +299,7 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
                 tr_fn += 1
             if actual and not(expected):
                 tr_fp += 1
+
 
     out = {'total': total, 'true_pos' : true_positive, 'true_neg' : true_negative, 'false_pos' : false_positive, 'false_neg' : false_negative, 'time':t1}
     out['tr_true_pos'] = tr_tp
