@@ -280,7 +280,7 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
                 false_negative += 1
             if actual and not(expected):
                 false_positive += 1
-
+    t1 = time() - t0
         for i, (face1, face2) in enumerate(training_data[0]):
             expected = training_data[1][i]
             if roc:
