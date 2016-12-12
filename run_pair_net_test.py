@@ -22,14 +22,14 @@ def timeout(seconds, f):
     return result
 
 print('hidden_nodes,output_nodes,resize,color,iterations,batch_size,choices,time,true_pos,true_neg,false_pos,false_neg,total,train_true_pos,train_true_neg,train_false_pos,train_false_neg')
-for output_size in [25, 25, 25]:
+for output_size in [25]:
 	for resize, color in [(.17, False)]:
-			for iterations, batch_size in [(20000, 4)]:
-				for choices in [2]:
+			for iterations, batch_size in [(60000, 1)]:
+				for choices in [1, 2, 3, 4]:
 					train, test = neural_triple.generate_model(output_size, int(resize*120), int(resize*240), iterations=iterations, batch_size=batch_size, color=color, consider=choices)
 					filename = 'resize%d_color%d.npy' % (int(100 * resize), int(color))
 
-					f = partial(load_lfw.run_test, 10, train, test, 'funneled', resize, color=color, file=filename, crop=(120,240), mirror=False, ids=True)
+					f = partial(load_lfw.run_test, 1, train, test, 'funneled', resize, color=color, file=filename, crop=(120,240), mirror=False, ids=True)
 					sys.stderr.write('output_size:%d, resize:%.2f, color:%d, iterations:%d, batch_size:%d, choices:%d\n' % (output_size, resize, int(color), iterations, batch_size, choices))
 					#results = timeout(360, f)
 					results=f()
