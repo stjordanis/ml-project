@@ -29,7 +29,7 @@ def perror2(s):
 ##############################################################################
 # TRAINING FUNCTION                                                          #
 ##############################################################################
-def generate_model(embedding, width, height, iterations, batch_size=1, color=False, consider=None, num_lr=5000):
+def generate_model(embedding, width, height, iterations, batch_size=1, color=False, consider=None, num_lr=5000, roc=False):
     if color:
         depth = 3
     else:
@@ -78,7 +78,7 @@ def generate_model(embedding, width, height, iterations, batch_size=1, color=Fal
         ######################################################################
         graph = tf.Graph()
         sess = tf.Session(graph=graph)
-        writer = tf.train.SummaryWriter('logs/%d' % time(), graph)
+        writer = tf.train.SummaryWriter('logs_choice/%d' % time(), graph)
 
         with graph.as_default():
             # Input layer.
@@ -253,7 +253,10 @@ def generate_model(embedding, width, height, iterations, batch_size=1, color=Fal
             distance = sess.run(distance_same, {input_layer1:face1, input_layer2:face2})
 
         # Run the distance through the logistic regression.
-        return lr.predict(distance.reshape(-1, 1))[0]
+        pred = lr.predict(distance.reshape(-1, 1))[0]
+        if roc:
+            return distance, pred
+        return pred
 
     return train_fn, outcome_fn
 
