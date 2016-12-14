@@ -24,7 +24,8 @@ def timeout(seconds, f):
 # .1 -> 12, 24
 # 
 print('hidden_nodes,resize,color,iterations,batch_size,time,true_pos,true_neg,false_pos,false_neg,total,train_true_pos,train_true_neg,train_false_pos,train_false_neg')
-for resize, color in [ (0.17, False), (0.17, True)]:
+for r in range(0, 1):	
+	for resize, color in [ (0.12, False), (0.12, True)]:
 		for iterations, batch_size in [(20000, 5), (20000, 10)]:
 			print "new test"
 			if resize == 0.07:

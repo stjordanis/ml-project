@@ -87,8 +87,8 @@ def get_these_images(images, type, resize, color, crop):
 		offw, offh = (x1 - x0 - ww)//2, (y1 - y0 - hh)//2
 		x0 += offw
 		y0 += offh
-		x1 = x0 + ww
-		y1 = y0 + hh
+		x1 -= offw
+		y1 -= offh
 
 	w = x1 - x0
 	h = y1 - y0
@@ -113,10 +113,8 @@ def get_these_images(images, type, resize, color, crop):
 			cache[os.path.basename(file)] = np.asarray(image, dtype=np.float64) / 255.
 		face = cache[os.path.basename(file)]
 
-
 		# Resize the image if requested.
-		face = face[x0:x1,y0:y1]
-
+		face = face[x0:x1][y0:y1]
 		if resize is not None:
 			face = imresize(face, resize)
 
@@ -224,7 +222,8 @@ def marshal_pairs(triplet_pairs, ids=False, mirror=False, augment=False):
 # {crop}: A tuple of two integers specifying the width and height that you want
 #         to crop the image into. Crop runs before resize. A good value is
 #         (150, 250) or (115, 250).
-def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=None, ids=False, mirror=False, augment=False):
+
+def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=None, ids=False, mirror=False, augment=False, roc=False):
     if file is not None and os.path.exists(file):
         fp = open(file, 'rb')
         sets = pickle.load(fp)
@@ -247,7 +246,7 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
     tr_tp = 0
     tr_fn = 0
     tr_tn = 0
-
+    roc_out = []
     t0 = time()
     # Create a holdout set.
     for test in range(folds):
@@ -256,7 +255,7 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
             to_marshall += sets[i]
 
         training_data = marshal_pairs(to_marshall, ids=ids, mirror=mirror, augment=augment)
-
+        #print(len(training_data))
         # Train the model.
         trained = train_fn(*training_data)
         t1 = time() - t0
@@ -265,7 +264,11 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
         # Test the model.
         for ((name1, num1, face1), (name2, num2, face2)) in sets[test]:
             expected = name1 == name2
-            actual = outcome_fn(face1, face2, trained)
+            if roc:
+                dist, actual = outcome_fn(face1, face2, trained)
+                roc_out.append((dist, expected))
+            else:
+                actual = outcome_fn(face1, face2, trained)
             total += 1
 
             if expected == actual and expected:
@@ -277,14 +280,14 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
             if actual and not(expected):
                 false_positive += 1
 
-    t1 = time() - t0
-    print ("precision = ",   float(true_positive) / (true_positive + false_positive))
-    print("recall = ", float(true_positive) / (true_positive + false_negative))
-    print("f1 score = ", 2.0*true_positive / (2.0*true_positive + false_positive + false_negative))
-    return {'total': total, 'true_pos' : true_positive, 'true_neg' : true_negative, 'false_pos' : false_positive, 'false_neg' : false_negative, 'time':t1}
+        
         for i, (face1, face2) in enumerate(training_data[0]):
+           # print("i = ", i)
             expected = training_data[1][i]
-            actual = outcome_fn(face1, face2, trained)
+            if roc:
+                dist, actual = outcome_fn(face1, face2, trained)
+            else:
+                actual = outcome_fn(face1, face2, trained)
             total += 1
 
             if expected == actual and expected:
@@ -302,7 +305,9 @@ def run_test(folds, train_fn, outcome_fn, type, resize, color, file=None, crop=N
     out['tr_true_neg'] = tr_tn
     out['tr_false_pos'] = tr_fp
     out['tr_false_neg'] = tr_fn
+    out['roc'] = roc_out
     return out
+
 
 
 class toy_harness:
